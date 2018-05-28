@@ -1,21 +1,18 @@
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
 
-LIBRARY Processor;
-USE Processor.Processor_pack.ALL;
-
 ENTITY UC IS
 	PORT (
 		clock			: IN	STD_LOGIC;
-		key_on		: IN	STD_LOGIC_VECTOR (2 DOWNTO 0);
-   	        key_code	: in	std_logic_vector(47 downto 0);
+		key_on		: IN	STD_LOGIC_VECTOR (2  DOWNTO 0);
+   	key_code	   : IN	STD_LOGIC_VECTOR (47 DOWNTO 0);
 		--IR_Ld, PC_Inc, ALU_2_DBus, DM_Rd, DM_Wr, PC_Ld_En, Reg_2_IO, IO_2_Reg, Reg_Wr, Stat_Wr, DM_2_DBus: OUT	STD_LOGIC		
 	);
 END ENTITY;
 
 ARCHITECTURE Behavior OF UC IS
 
-  TYPE states_UC IS (INICIO, INICIO_PARTIDA, PARTIDA, GAME_OVER);
+	TYPE states_UC IS (INICIO, INICIO_PARTIDA, PARTIDA, GAME_OVER);
 	SIGNAL current_state : states_UC := INICIO;
   
 BEGIN
@@ -28,11 +25,11 @@ BEGIN
 			CASE current_state IS
 			
 				WHEN INICIO => 
-          				current_state <= INICIO_PARTIDA;
+					current_state <= INICIO_PARTIDA;
           
-       				WHEN INICIO_PARTIDA =>
+				WHEN INICIO_PARTIDA =>
           
-        			WHEN PARTIDA =>
+				WHEN PARTIDA =>
 					CASE key_on IS
 						WHEN "000" =>
 
