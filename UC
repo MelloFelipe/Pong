@@ -16,12 +16,12 @@ END ENTITY;
 
 ARCHITECTURE Behavior OF UC IS
 
-  TYPE states_UC IS (FETCH, DECODE, EX);
-	SIGNAL current_state : states_UC := FETCH;
+  TYPE states_UC IS (INICIO, INICIO_PARTIDA, PARTIDA, GAME_OVER);
+	SIGNAL current_state : states_UC := INICIO;
   
 BEGIN
 	StateMachine:
-	PROCESS (clear, clock, key_on, current_state)
+	PROCESS (clock, key_on, current_state)
 	BEGIN
 		IF (clock'EVENT AND clock = '1') THEN
 			IR_Ld		<= '0';
