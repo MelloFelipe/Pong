@@ -24,8 +24,12 @@ BEGIN
 			
 			CASE current_state IS
 			
-				WHEN INICIO => 
-					current_state <= INICIO_PARTIDA;
+				WHEN INICIO =>
+					IF key_on(0) = '1' THEN
+						IF key_code(15 downto 0) = "005A" THEN-- Enter
+							current_state <= INICIO_PARTIDA;
+						END IF;
+					END IF;
           
 				WHEN INICIO_PARTIDA =>
           
