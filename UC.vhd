@@ -75,16 +75,12 @@ architecture comportamento of UC is
   -- PAD tem o seu tamanho definido como 7 pixels
   signal pos_PAD1 : integer range 0 to 95;   -- linha atual do pixel central do PAD1
   signal pos_PAD2 : integer range 0 to 95;   -- linha atual do pixel central do PAD2
-  signal prox_pos_PAD1 : integer range 0 to 95;   -- possivel proxima linha do pixel central do PAD1
-  signal prox_pos_PAD2 : integer range 0 to 95;   -- possivel proxima linha do pixel central do PAD2
 
-  signal atualiza_pos_PAD1 : std_logic;    -- se '1' = PAD1 muda sua pos. no eixo y
-  signal atualiza_pos_PAD2 : std_logic;    -- se '1' = PAD2 muda sua pos. no eixo y
+  signal atualiza_pos_PADs : std_logic;    -- se '1' = PAD1 e PAD2 muda sua pos. no eixo y
   
   -- O QUE FALTA:
-  -- Implementar a contrucao de todas as telas (inicio, partida e game_over), talvez a construcao da bola ja esteja 10/10
+  -- Implementar a contrucao de todas as telas (inicio, partida e game_over), talvez a construcao da bola e dos PADs ja esteja 10/10
   -- Criar sinais que guardam a pontuacao
-  -- Calcular posicao dos PADS com base nas teclas pressionadas
   
 begin  -- comportamento
 
@@ -188,23 +184,20 @@ begin  -- comportamento
       if atualiza_pos_bola_x = '1' then
         if direcao = direita then         
           if pos_bola_x = 127 then -- BOLA PODE CHEGAR NA FRONTEIRA
-				-- VERIFICAR SE O PAD2 ESTÁ NA LINHA ONDE A BOLA PODE CHEGAR
-				if pos_bola_y > (prox_pos_PAD2 - 4) AND pos_bola_y < (prox_pos_PAD2 + 4) then
+				if abs(pos_bola_y - pos_PAD2) < 4 then -- VERIFICAR SE O PAD2 ESTÁ NA LINHA ONDE A BOLA PODE CHEGAR
 					direcao := esquerda;
-					-- CALCULAR NOVA derivada_bola
-					derivada_bola <= pos_bola_y - prox_pos_PAD2;
+					derivada_bola <= pos_bola_y - pos_PAD2; -- CALCULAR NOVA derivada_bola
 				else
 					-- MAIS UM PONTO PARA O PAD1
 				end if;    
           else
-            pos_bola_x <= pos_bola_x + 1; -- TROCAR PARA SOMAR COM A derivada_bola, TOMAR CUIDADO CASO A SOMA PASSE DOS LIMITES
+            pos_bola_x <= pos_bola_x + 1;
           end if;        
         else  -- se a direcao é esquerda
           if pos_bola_x = 0 then
-				if pos_bola_y > (prox_pos_PAD1 - 4) AND pos_bola_y < (prox_pos_PAD1 + 4) then
+				if abs(pos_bola_y - pos_PAD1) < 4 then
 					direcao := direita;
-					-- CALCULAR NOVA derivada_bola
-					derivada_bola <= pos_bola_y - prox_pos_PAD1;
+					derivada_bola <= pos_bola_y - pos_PAD1;
 				else
 					-- MAIS UM PONTO PARA O PAD2
 				end if;
@@ -255,22 +248,59 @@ begin  -- comportamento
       end if;
     end if;
   end process p_atualiza_pos_bola_y;
-
-  -----------------------------------------------------------------------------
+  
+  -- purpose: Este processo irá atualizar a posicao dos PAD's
+  -- type   : sequential
+  -- inputs : CLOCK_50
+  -- outputs: pos_PAD1 e pos_PAD2
+  p_atualiza_pos_PADs: process (CLOCK_50)
+  begin
+    if CLOCK_50'event and CLOCK_50 = '1' then  -- rising clock edge
+      if atualiza_pos_PADs = '1' then
+			if key_code(15 downto 0) = x"E075" or key_code(31 downto 16) = x"E075"
+		   or key_code(47 downto 32) = x"E075"	then -- Up arrow pressionada
+				if pos_PAD1 > 3 then -- PAD1 nao está no limite superior
+					pos_PAD1 <= pos_PAD1 + 1;
+				end if;
+			end if;
+			if key_code(15 downto 0) = x"E072" or key_code(31 downto 16) = x"E072"
+		   or key_code(47 downto 32) = x"E072"	then -- Down arrow pressionada
+				if pos_PAD1 < 92 then -- PAD1 nao está no limite inferior
+					pos_PAD1 <= pos_PAD1 - 1;
+				end if;
+			end if;
+			if key_code(15 downto 0) = x"001D" or key_code(31 downto 16) = x"001D"
+		   or key_code(47 downto 32) = x"001D"	then -- tecla 'W' pressionada
+				if pos_PAD2 > 3 then -- PAD2 nao está no limite superior
+					pos_PAD2 <= pos_PAD2 + 1;
+				end if;
+			end if;
+			if key_code(15 downto 0) = x"001B" or key_code(31 downto 16) = x"001B"
+		   or key_code(47 downto 32) = x"001B"	then -- tecla 'S' pressionada
+				if pos_PAD2 < 92 then -- PAD2 nao está no limite inferior
+					pos_PAD2 <= pos_PAD2 - 1;
+				end if;
+			end if;
+      end if;
+	end if;
+  end process p_atualiza_pos_PADs;
+  
+   -----------------------------------------------------------------------------
   -- Brilho do pixel
   -----------------------------------------------------------------------------
   -- O brilho do pixel é branco quando os contadores de linha e coluna, que
   -- indicam o endereço do pixel sendo escrito para o quadro atual, casam com a
-  -- posição da bola (sinais pos_bola_x e pos_bola_y). Caso contrário,
-  -- o pixel é preto.
+  -- posição da bola (sinais pos_bola_x e pos_bola_y) ou com a posição dos PADs.
+  -- Caso contrário, o pixel é preto.
 
-  pixel_bit <= '1' when (col = pos_bola_x) and (line = pos_bola_y) else '0';
+  pixel_bit <= '1' when ((col = pos_bola_x) and (line = pos_bola_y)) 
+					or (abs(line-pos_PAD1) < 4) or (abs(line-pos_PAD2) < 4) else '0';
   pixel <= (others => pixel_bit);
   
   -- O endereço de memória pode ser construído com essa fórmula simples,
   -- a partir da linha e coluna atual
   addr  <= col + (128 * line);
-
+  
   -----------------------------------------------------------------------------
   -- Processos que definem a FSM (finite state machine), nossa máquina
   -- de estados de controle.
