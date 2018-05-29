@@ -1,5 +1,6 @@
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
+USE work.UC_pack.ALL;
 
 ENTITY UC IS
 	PORT (
@@ -12,7 +13,16 @@ END ENTITY;
 
 ARCHITECTURE Behavior OF UC IS
 
-	TYPE states_UC IS (INICIO, INICIO_PARTIDA, PARTIDA, GAME_OVER);
+	COMPONENT constroi_quadro
+	port (
+		 clock        : in std_logic;
+		 current_state: in states_UC;
+		 VGA_R, VGA_G, VGA_B    : out std_logic_vector(7 downto 0);
+		 VGA_HS, VGA_VS         : out std_logic;
+		 VGA_BLANK_N, VGA_SYNC_N: out std_logic;
+		 VGA_CLK                : out std_logic
+		 );
+	END COMPONENT;
 	SIGNAL current_state : states_UC := INICIO;
   
 BEGIN
@@ -55,4 +65,7 @@ BEGIN
 			END CASE;
 		END IF;
 	END PROCESS;
+	
+	DefineTela: constroi_quadro PORT MAP(clock, current_state, 
+	
 END ARCHITECTURE;
