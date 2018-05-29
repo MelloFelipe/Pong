@@ -4,9 +4,9 @@ use ieee.std_logic_1164.all;
 entity UC is
   port (    
     CLOCK_50                  : in  std_logic;
-    --KEY                       : in  std_logic_vector(0 downto 0);
-    key_on							: in	std_logic_vector(2 downto 0);
-    key_code						: in	std_logic_vector(47 downto 0);
+  --KEY                       : in  std_logic_vector(0 downto 0);
+    key_on                    : in	std_logic_vector(2 downto 0);
+    key_code                  : in	std_logic_vector(47 downto 0);
     VGA_R, VGA_G, VGA_B       : out std_logic_vector(7 downto 0);
     VGA_HS, VGA_VS            : out std_logic;
     VGA_BLANK_N, VGA_SYNC_N   : out std_logic;
