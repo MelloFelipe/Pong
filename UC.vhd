@@ -51,10 +51,11 @@ architecture comportamento of UC is
   signal atualiza_pos_bola_y : std_logic;    -- se '1' = bola muda sua pos. no eixo y
 
   signal derivada_bola : integer range -3 to 3; -- angulo da direcao da bola
-  -- derivada_bola_bola = 0: angulo de 0 graus em relacao ao eixo x
-  -- derivada_bola_bola = 1: angulo de +-45 graus em relacao ao eixo x
-  -- derivada_bola_bola = 2: angulo de +-63.435 graus em relacao ao eixo x
+  -- derivada_bola_bola = 0: angulo de 0            graus em relacao ao eixo x
+  -- derivada_bola_bola = 1: angulo de +-45         graus em relacao ao eixo x
+  -- derivada_bola_bola = 2: angulo de +-63.435     graus em relacao ao eixo x
   -- derivada_bola_bola = 3: angulo de +-71.5650512 graus em relacao ao eixo x
+  
   -- Especificação dos tipos e sinais da máquina de estados de controle
   type estado_t is (inicio_jogo, inicio_partida, constroi_quadro, move_bola);
   signal estado: estado_t := inicio_jogo;
