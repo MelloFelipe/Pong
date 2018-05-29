@@ -50,6 +50,11 @@ architecture comportamento of UC is
   signal atualiza_pos_bola_x : std_logic;    -- se '1' = bola muda sua pos. no eixo x
   signal atualiza_pos_bola_y : std_logic;    -- se '1' = bola muda sua pos. no eixo y
 
+  signal derivada_bola : integer range -3 to 3; -- angulo da direcao da bola
+  -- derivada_bola_bola = 0: angulo de 0 graus em relacao ao eixo x
+  -- derivada_bola_bola = 1: angulo de +-45 graus em relacao ao eixo x
+  -- derivada_bola_bola = 2: angulo de +-63.435 graus em relacao ao eixo x
+  -- derivada_bola_bola = 3: angulo de +-71.5650512 graus em relacao ao eixo x
   -- Especificação dos tipos e sinais da máquina de estados de controle
   type estado_t is (inicio_jogo, inicio_partida, constroi_quadro, move_bola);
   signal estado: estado_t := inicio_jogo;
@@ -67,16 +72,20 @@ architecture comportamento of UC is
   signal sync, blank: std_logic;
 
   -- Sinais para controlar o movimento dos PAD's
-
+  -- PAD tem o seu tamanho definido como 7 pixels
   signal pos_PAD1 : integer range 0 to 95;   -- linha atual do pixel central do PAD1
   signal pos_PAD2 : integer range 0 to 95;   -- linha atual do pixel central do PAD2
+  signal prox_pos_PAD1 : integer range 0 to 95;   -- possivel proxima linha do pixel central do PAD1
+  signal prox_pos_PAD2 : integer range 0 to 95;   -- possivel proxima linha do pixel central do PAD2
 
   signal atualiza_pos_PAD1 : std_logic;    -- se '1' = PAD1 muda sua pos. no eixo y
   signal atualiza_pos_PAD2 : std_logic;    -- se '1' = PAD2 muda sua pos. no eixo y
   
   -- O QUE FALTA:
-  -- vgaball sempre atualiza a posicao x e y ao mesmo tempo, ou seja, a bola nunca
-  -- vai perfeitamente na horizontal.
+  -- Implementar a contrucao de todas as telas (inicio, partida e game_over), talvez a construcao da bola ja esteja 10/10
+  -- Criar sinais que guardam a pontuacao
+  -- Calcular posicao dos PADS com base nas teclas pressionadas
+  
 begin  -- comportamento
 
 
@@ -178,15 +187,27 @@ begin  -- comportamento
     elsif CLOCK_50'event and CLOCK_50 = '1' then  -- rising clock edge
       if atualiza_pos_bola_x = '1' then
         if direcao = direita then         
-          if pos_bola_x = 127 then -- BOLA CHEGOU NA FRONTEIRA
-				-- TEMOS QUE FAZER ALGUM CÁLCULO AQUI
-            direcao := esquerda;  
+          if pos_bola_x = 127 then -- BOLA PODE CHEGAR NA FRONTEIRA
+				-- VERIFICAR SE O PAD2 ESTÁ NA LINHA ONDE A BOLA PODE CHEGAR
+				if pos_bola_y > (prox_pos_PAD2 - 4) AND pos_bola_y < (prox_pos_PAD2 + 4) then
+					direcao := esquerda;
+					-- CALCULAR NOVA derivada_bola
+					derivada_bola <= pos_bola_y - prox_pos_PAD2;
+				else
+					-- MAIS UM PONTO PARA O PAD1
+				end if;    
           else
-            pos_bola_x <= pos_bola_x + 1;
+            pos_bola_x <= pos_bola_x + 1; -- TROCAR PARA SOMAR COM A derivada_bola, TOMAR CUIDADO CASO A SOMA PASSE DOS LIMITES
           end if;        
         else  -- se a direcao é esquerda
           if pos_bola_x = 0 then
-            direcao := direita;
+				if pos_bola_y > (prox_pos_PAD1 - 4) AND pos_bola_y < (prox_pos_PAD1 + 4) then
+					direcao := direita;
+					-- CALCULAR NOVA derivada_bola
+					derivada_bola <= pos_bola_y - prox_pos_PAD1;
+				else
+					-- MAIS UM PONTO PARA O PAD2
+				end if;
           else
             pos_bola_x <= pos_bola_x - 1;
           end if;
@@ -212,13 +233,23 @@ begin  -- comportamento
           if pos_bola_y = 95 then
             direcao := sobe;  
           else
-            pos_bola_y <= pos_bola_y + 1;
+            --pos_bola_y <= pos_bola_y + 1;
+				if derivada_bola > 0 then -- se bateu na parte de cima do PAD
+					direcao := sobe;
+				else -- se bateu na parte de baixo do PAD
+					pos_bola_y <= pos_bola_y - derivada_bola; -- subtracao, pois derivada_bola é < 0
+			   end if;
           end if;        
         else  -- se a direcao é para subir
           if pos_bola_y = 0 then
             direcao := desce;
           else
-            pos_bola_y <= pos_bola_y - 1;
+            --pos_bola_y <= pos_bola_y - 1;
+				if derivada_bola < 0 then -- se bateu na parte de baixo do PAD
+					direcao := desce;
+				else -- se bateu na parte de cima do PAD
+					pos_bola_y <= pos_bola_y - derivada_bola; -- subtracao, pois derivada_bola é > 0
+				end if;
           end if;
         end if;
       end if;
