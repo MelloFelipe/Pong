@@ -230,7 +230,10 @@ begin  -- comportamento
 				if derivada_bola > 0 then -- se bateu na parte de cima do PAD
 					direcao := sobe;
 				else -- se bateu na parte de baixo do PAD
-					pos_bola_y <= pos_bola_y - derivada_bola; -- subtracao, pois derivada_bola é < 0
+					if (pos_bola_y - derivada_bola) > 95 then -- se sair dos limites
+						pos_bola_y <= 95;
+					else
+						pos_bola_y <= pos_bola_y - derivada_bola; -- subtracao, pois derivada_bola é < 0
 			   end if;
           end if;        
         else  -- se a direcao é para subir
@@ -241,7 +244,10 @@ begin  -- comportamento
 				if derivada_bola < 0 then -- se bateu na parte de baixo do PAD
 					direcao := desce;
 				else -- se bateu na parte de cima do PAD
-					pos_bola_y <= pos_bola_y - derivada_bola; -- subtracao, pois derivada_bola é > 0
+					if (pos_bola_y - derivada_bola) < 0 then -- se sair dos limites
+						pos_bola_y <= 0;
+					else
+						pos_bola_y <= pos_bola_y - derivada_bola; -- subtracao, pois derivada_bola é > 0
 				end if;
           end if;
         end if;
