@@ -195,7 +195,9 @@ begin  -- comportamento
 					derivada_bola <= pos_bola_y - pos_PAD2; -- calculo da nova derivada_bola
 				else
 					pontos_PAD1 <= pontos_PAD1 + 1; -- mais um ponto para o PAD1
-					ponto <= '1'; -- Avanca para o proximo estado
+				   pos_bola_x <= 64;
+				   --pos_bola_y <= 80;
+				   derivada_bola <= -1;
 				end if;    
           else
             pos_bola_x <= pos_bola_x + 1;
@@ -207,7 +209,9 @@ begin  -- comportamento
 					derivada_bola <= pos_bola_y - pos_PAD1;
 				else
 					pontos_PAD2 <= pontos_PAD2 + 1; -- mais um ponto para o PAD2
-					ponto <= '1'; -- Avanca para o proximo estado
+					pos_bola_x <= 64;
+		         --pos_bola_y <= 80;
+		         derivada_bola <= -1;
 				end if;
           else
             pos_bola_x <= pos_bola_x - 1;
@@ -310,7 +314,8 @@ begin  -- comportamento
   -- Caso contrário, o pixel é preto.
 
   pixel_bit <= '1' when ((col = pos_bola_x) and (line = pos_bola_y)) 
-					or (abs(line-pos_PAD1) < 4) or (abs(line-pos_PAD2) < 4) else '0';
+					or ((abs(line-pos_PAD1) < 4) and col = 0)
+					or ((abs(line-pos_PAD2) < 4) and col = 127) else '0';
   pixel <= (others => pixel_bit);
   
   -- O endereço de memória pode ser construído com essa fórmula simples,
@@ -328,7 +333,7 @@ begin  -- comportamento
   -- inputs : estado, fim_escrita, timer
   -- outputs: proximo_estado, atualiza_pos_bola_x, atualiza_pos_bola_y, line_rstn,
   --          line_enable, col_rstn, col_enable, we, timer_enable, timer_rstn
-  logica_mealy: process (estado, fim_escrita, timer, ponto)
+  logica_mealy: process (estado, fim_escrita, timer)
   begin  -- process logica_mealy
     case estado is
       when inicio_partida    => if timer = '1' then              
@@ -363,11 +368,7 @@ begin  -- comportamento
                              timer_rstn     <= '0'; 
                              timer_enable   <= '0';
 
-      when move_bola_e_PADs=>if ponto = '1' then
-		                         proximo_estado <= reseta_partida;
-									  else
-									    proximo_estado <= inicio_partida;
-									  end if;
+      when move_bola_e_PADs=>proximo_estado <= inicio_partida;
                              atualiza_pos_bola_x <= '1';
                              atualiza_pos_bola_y <= '1';
 									  atualiza_pos_PADs   <= '1';
@@ -384,7 +385,7 @@ begin  -- comportamento
 									  else
 									    proximo_estado <= game_over;
 									  end if;
-		                       pontuacao_enable <= '1';
+		                       --pontuacao_enable <= '1';
 									  atualiza_pos_bola_x <= '0';
                              atualiza_pos_bola_y <= '0';
 									  atualiza_pos_PADs   <= '0';
