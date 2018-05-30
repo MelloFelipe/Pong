@@ -74,8 +74,8 @@ architecture comportamento of UC is
 
   -- Sinais para controlar o movimento dos PAD's
   -- PAD tem o seu tamanho definido como 7 pixels
-  signal pos_PAD1 : integer range 0 to 95;   -- linha atual do pixel central do PAD1
-  signal pos_PAD2 : integer range 0 to 95;   -- linha atual do pixel central do PAD2
+  signal pos_PAD1 : integer range 3 to 92;   -- linha atual do pixel central do PAD1
+  signal pos_PAD2 : integer range 3 to 92;   -- linha atual do pixel central do PAD2
 
   signal atualiza_pos_PADs : std_logic;    -- se '1' = PAD1 e PAD2 muda sua pos. no eixo y
   
