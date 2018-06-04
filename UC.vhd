@@ -90,6 +90,9 @@ architecture comportamento of UC is
   
   -- ideia para deixar mais bonito: na maquina de estados, zerar tudo antes do case e so alterar para 1 dentro do case (igual ao lab10), na verdade talvez isso de problemas
   
+  type matrix_t is array(4 downto 0, 4 downto 0) of std_logic;
+  signal display_placar1 : matrix_t;
+  
 begin  -- comportamento
 
 
@@ -334,6 +337,38 @@ begin  -- comportamento
 --  pixel_bit <= '1' when ((col = pos_bola_x) and (line = pos_bola_y)) 
 --					or ((abs(line-pos_PAD1) < 4) and col = 0)
 --					or ((abs(line-pos_PAD2) < 4) and col = 127) else '0';
+
+	-- Matriz 5x5 eh o suficiente para mostrar os 8 primeiros algarismos na tela
+	-- (0,0) (0,1) (0,2) (0,3) (0,4) (0,5)
+	-- (1,0) (1,1) (1,2) (1,3) (1,4) (1,5)
+	-- (2,0) (2,1) (2,2) (2,3) (2,4) (2,5)
+	-- (3,0) (3,1) (3,2) (3,3) (3,4) (3,5)
+	-- (4,0) (4,1) (4,2) (4,3) (4,4) (4,5)
+	-- (5,0) (5,1) (5,2) (5,3) (5,4) (5,5)
+	-- Numero 0: display_placar1(0)(0) <= '0' -- preto
+	--				 display_placar1(0)(1) <= '1' -- branco
+	--				 display_placar1(0)(2) <= '1'
+	--				 display_placar1(0)(3) <= '1'
+	--				 display_placar1(0)(4) <= '1'
+	--				 display_placar1(0)(5) <= '0'
+	--				 display_placar1(1)(0) <= '1'
+	--				 display_placar1(1)(1) <= '0'
+	--				 display_placar1(1)(2) <= '0'
+	--				 display_placar1(1)(3) <= '0'
+	--				 display_placar1(1)(4) <= '0'
+	--				 display_placar1(1)(5) <= '1'
+	-- ...
+	--	when inicio_partida => if ((col = pos_bola_x) and (line = pos_bola_y)) 
+	--												 or ((abs(line-pos_PAD1) < 4) and col = 0)
+	--												 or ((abs(line-pos_PAD2) < 4) and col = 127) then
+	--												pixel_bit <= '1';
+	--                        elsif ((abs(line-5) < 3) and ((abs(col-55) < 3) then
+   --								    pixel_bit <= display)placar1(line-3)(col-53);
+	--                        elsif ((abs(line-5) < 3) and ((abs(col-71) < 3) then
+   --								    pixel_bit <= display)placar2(line-3)(col-69);	
+	--                        else
+   --								    pixel_bit <= '0';	
+	--                        end if;
 
 	process(CLOCK_50)
 	  begin
