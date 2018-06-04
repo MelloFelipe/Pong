@@ -331,9 +331,32 @@ begin  -- comportamento
   -- posição da bola (sinais pos_bola_x e pos_bola_y) ou com a posição dos PADs.
   -- Caso contrário, o pixel é preto.
 
-  pixel_bit <= '1' when ((col = pos_bola_x) and (line = pos_bola_y)) 
-					or ((abs(line-pos_PAD1) < 4) and col = 0)
-					or ((abs(line-pos_PAD2) < 4) and col = 127) else '0';
+--  pixel_bit <= '1' when ((col = pos_bola_x) and (line = pos_bola_y)) 
+--					or ((abs(line-pos_PAD1) < 4) and col = 0)
+--					or ((abs(line-pos_PAD2) < 4) and col = 127) else '0';
+
+	process(CLOCK_50)
+	  begin
+		 if CLOCK_50'event and CLOCK_50 = '1' then
+			case estado is
+			  when inicio_jogo    => pixel_bit <= '0';
+										  
+			  when inicio_partida => if ((col = pos_bola_x) and (line = pos_bola_y)) 
+												 or ((abs(line-pos_PAD1) < 4) and col = 0)
+												 or ((abs(line-pos_PAD2) < 4) and col = 127) then
+												pixel_bit <= '1';
+											 else
+												pixel_bit <= '0';
+											 end if;
+
+			  when game_over      => pixel_bit <= '0';
+			
+			  when others         => pixel_bit <= pixel_bit;
+			  
+			end case;
+		 end if;
+	  end process;
+	  
   pixel <= (others => pixel_bit);
   
   -- O endereço de memória pode ser construído com essa fórmula simples,
