@@ -4,9 +4,11 @@ use ieee.std_logic_1164.all;
 entity UC is
   port (    
     CLOCK_50                  : in  std_logic;
+	 PS2_DAT : inout STD_LOGIC;
+    PS2_CLK : inout STD_LOGIC;
   --KEY                       : in  std_logic_vector(0 downto 0);
-    key_on                    : in	std_logic_vector(2 downto 0);
-    key_code                  : in	std_logic_vector(47 downto 0);
+    --key_on                    : in	std_logic_vector(2 downto 0);
+    --key_code                  : in	std_logic_vector(47 downto 0);
     VGA_R, VGA_G, VGA_B       : out std_logic_vector(7 downto 0);
     VGA_HS, VGA_VS            : out std_logic;
     VGA_BLANK_N, VGA_SYNC_N   : out std_logic;
@@ -45,19 +47,19 @@ architecture comportamento of UC is
   -- na tela de acordo com sua posição.
 
   signal pos_bola_x : integer range 0 to 127 := 64;  -- coluna atual da bola
-  signal pos_bola_y : integer range 0 to 95  := 80;  -- linha atual da bola
+  signal pos_bola_y : integer range 0 to 95  := 47;  -- linha atual da bola
 
   signal atualiza_pos_bola_x : std_logic;    -- se '1' = bola muda sua pos. no eixo x
   signal atualiza_pos_bola_y : std_logic;    -- se '1' = bola muda sua pos. no eixo y
 
-  signal derivada_bola : integer range -3 to 3 := 1; -- angulo da direcao da bola
+  signal derivada_bola : integer range -3 to 3 := 0; -- angulo da direcao da bola
   -- derivada_bola_bola = 0: angulo de 0            graus em relacao ao eixo x
   -- derivada_bola_bola = 1: angulo de +-45         graus em relacao ao eixo x
   -- derivada_bola_bola = 2: angulo de +-63.435     graus em relacao ao eixo x
   -- derivada_bola_bola = 3: angulo de +-71.5650512 graus em relacao ao eixo x
   
   -- Especificação dos tipos e sinais da máquina de estados de controle
-  type estado_t is (inicio_jogo, inicio_partida, constroi_quadro, move_bola_e_PADs, reseta_partida, game_over);
+  type estado_t is (inicio_jogo, inicio_partida, constroi_quadro, move_bola_e_PADs, game_over);
   signal estado: estado_t := inicio_jogo;
   signal proximo_estado: estado_t := inicio_jogo;
 
@@ -83,12 +85,19 @@ architecture comportamento of UC is
   signal pontos_PAD1 : integer range 0 to 7 := 0;   -- pontos marcados pelo PAD1
   signal pontos_PAD2 : integer range 0 to 7 := 0;   -- pontos marcados pelo PAD2
   
-  signal flag_inicio : std_logic := '0'; -- verifica se o jogo foi iniciado
+  signal flag_inicio, flag_fim : std_logic := '0'; -- verifica se o jogo foi iniciado
   signal flag_inicio_rstn : std_logic := '1'; -- reseta valor da flag, ativo em baixo
   -- O QUE FALTA:
   -- Implementar a contrucao de todas as telas (inicio, partida, reseta_partida e game_over), talvez a construcao da bola e dos PADs ja esteja 10/10
   
-  -- ideia para deixar mais bonito: na maquina de estados, zerar tudo antes do case e so alterar para 1 dentro do case (igual ao lab10), na verdade talvez isso de problemas
+  -- ideia para deixar mais bonito: na maquina de estados, zerar tudo antes do case e so alterar para 1 dentro do case (igual ao lab10), na verdade talvez isso de problemas na verdade deve funcionar sim
+  
+  type matrix_pequena is array(4 downto 0, 4 downto 0) of std_logic;
+  signal display_placar1, display_placar2 : matrix_pequena;
+  type matrix_grande is array(4 downto 0, 46 downto 0) of std_logic;
+  signal display_mensagem : matrix_grande;
+  signal key_on : std_logic_vector(2 downto 0);
+  signal key_code : std_logic_vector(47 downto 0);
   
 begin  -- comportamento
 
@@ -117,6 +126,15 @@ begin  -- comportamento
   VGA_SYNC_N <= NOT sync;
   VGA_BLANK_N <= NOT blank;
 
+  kbdex_controller: entity work.kbdex_ctrl generic map(clkfreq=>50000) port map (
+      ps2_data	=> PS2_DAT,
+		ps2_clk	=> PS2_CLK,
+		clk		=> CLOCK_50,
+		en			=> '1',
+		resetn	=> '1',
+		lights	=> "000",
+		key_on	=> key_on,
+		key_code	=> key_code);
   -----------------------------------------------------------------------------
   -- Processos que controlam contadores de linhas e coluna para varrer
   -- todos os endereços da memória de vídeo, no momento de construir um quadro.
@@ -152,7 +170,7 @@ begin  -- comportamento
     if line_rstn = '0' then                  -- asynchronous reset (active low)
       line <= 0;
     elsif CLOCK_50'event and CLOCK_50 = '1' then  -- rising clock edge
-      -- o contador de linha só incrementa quando o contador de colunas
+      -- o continicio_jogoador de linha só incrementa quando o contador de colunas
       -- chegou ao fim (valor 127)
       if line_enable = '1' and col = 127 then
         if line = 95 then               -- conta de 0 a 95 (96 linhas)
@@ -172,16 +190,13 @@ begin  -- comportamento
 				 
   -----------------------------------------------------------------------------
   -- Processo que verifica se o jogo deve ser iniciado
-  verifica_inicio: process(CLOCK_50)
+  verifica_inicio: process(CLOCK_50, flag_inicio_rstn)
   begin
-	if rising_edge(CLOCK_50) then
-		if flag_inicio_rstn = '0' then
+   if flag_inicio_rstn = '0' then
 			flag_inicio <= '0';
-		end if;
-		if flag_inicio <= '0' then
-			if key_code(15 downto 0) = x"005A" then -- se a tecla "ENTER" for pressionada
-				flag_inicio <= '1';
-			end if;
+	elsif CLOCK_50'event and CLOCK_50 = '1' then
+		if key_code(15 downto 0) = x"005A" or key_code(15 downto 0) = x"E05A" then -- se a tecla "ENTER" for pressionada
+			flag_inicio <= '1';
 		end if;
 	end if;
   end process verifica_inicio;
@@ -207,12 +222,17 @@ begin  -- comportamento
     elsif CLOCK_50'event and CLOCK_50 = '1' then  -- rising clock edge
       if atualiza_pos_bola_x = '1' then
         if direcao = direita then         
-          if pos_bola_x = 127 then -- bola pode chegar na fronteira
+          if pos_bola_x = 117 then -- bola pode chegar na fronteira
 				if abs(pos_bola_y - pos_PAD2) < 4 then -- verificar se o PAD2 está na linha onde a bola pode chegar
 					direcao := esquerda;
-					derivada_bola <= pos_bola_y - pos_PAD2; -- calculo da nova derivada_bola
+					derivada_bola <= pos_PAD2 - pos_bola_y; -- calculo da nova derivada_bola
 				else
 					pontos_PAD1 <= pontos_PAD1 + 1; -- mais um ponto para o PAD1
+					if pontos_PAD1 >= 6 then
+						flag_fim <= '1';
+					else
+						flag_fim <= '0';
+						end if;
 				   pos_bola_x <= 64;
 				   --pos_bola_y <= 80;
 				   derivada_bola <= -1;
@@ -221,12 +241,17 @@ begin  -- comportamento
             pos_bola_x <= pos_bola_x + 1;
           end if;        
         else  -- se a direcao é esquerda
-          if pos_bola_x = 0 then
+          if pos_bola_x = 10 then
 				if abs(pos_bola_y - pos_PAD1) < 4 then
 					direcao := direita;
-					derivada_bola <= pos_bola_y - pos_PAD1;
+					derivada_bola <= pos_PAD1 - pos_bola_y;
 				else
 					pontos_PAD2 <= pontos_PAD2 + 1; -- mais um ponto para o PAD2
+					if pontos_PAD2 >= 6 then
+						flag_fim <= '1';
+					else
+						flag_fim <= '0';
+						end if;
 					pos_bola_x <= 64;
 		         --pos_bola_y <= 80;
 		         derivada_bola <= -1;
@@ -256,27 +281,27 @@ begin  -- comportamento
           if pos_bola_y = 95 then
             direcao := sobe;  
           else
-            --pos_bola_y <= pos_bola_y + 1;
-				if derivada_bola > 0 then -- se bateu na parte de cima do PAD
-					direcao := sobe;
-				else -- se bateu na parte de baixo do PAD
-					if (pos_bola_y - derivada_bola) > 95 then -- se sair dos limites
-						pos_bola_y <= 95;
+			--pos_bola_y <= pos_bola_y + 1;
+				if (pos_bola_y - derivada_bola) < 0 or (pos_bola_y + derivada_bola) > 95 then -- se sair dos limites
+					pos_bola_y <= 95;
+				else
+					if derivada_bola > 0 then
+						pos_bola_y <= pos_bola_y + derivada_bola;
 					else
 						pos_bola_y <= pos_bola_y - derivada_bola; -- subtracao, pois derivada_bola é < 0
 					end if;
-			   end if;
+				end if;
           end if;        
         else  -- se a direcao é para subir
           if pos_bola_y = 0 then
             direcao := desce;
           else
             --pos_bola_y <= pos_bola_y - 1;
-				if derivada_bola < 0 then -- se bateu na parte de baixo do PAD
-					direcao := desce;
-				else -- se bateu na parte de cima do PAD
-					if (pos_bola_y - derivada_bola) < 0 then -- se sair dos limites
-						pos_bola_y <= 0;
+				if (pos_bola_y - derivada_bola) < 0 or (pos_bola_y + derivada_bola) < 0 then -- se sair dos limites
+					pos_bola_y <= 0;
+				else
+					if derivada_bola < 0 then
+						pos_bola_y <= pos_bola_y + derivada_bola;
 					else
 						pos_bola_y <= pos_bola_y - derivada_bola; -- subtracao, pois derivada_bola é > 0
 					end if;
@@ -297,26 +322,26 @@ begin  -- comportamento
       if atualiza_pos_PADs = '1' then
 			if key_code(15 downto 0) = x"E075" or key_code(31 downto 16) = x"E075"
 		   or key_code(47 downto 32) = x"E075"	then -- Up arrow pressionada
-				if pos_PAD1 > 3 then -- PAD1 nao está no limite superior
-					pos_PAD1 <= pos_PAD1 + 1;
+				if pos_PAD2 > 3 then -- PAD1 nao está no limite superior
+					pos_PAD2 <= pos_PAD2 - 1;
 				end if;
 			end if;
 			if key_code(15 downto 0) = x"E072" or key_code(31 downto 16) = x"E072"
 		   or key_code(47 downto 32) = x"E072"	then -- Down arrow pressionada
-				if pos_PAD1 < 92 then -- PAD1 nao está no limite inferior
-					pos_PAD1 <= pos_PAD1 - 1;
+				if pos_PAD2 < 92 then -- PAD1 nao está no limite inferior
+					pos_PAD2 <= pos_PAD2 + 1;
 				end if;
 			end if;
 			if key_code(15 downto 0) = x"001D" or key_code(31 downto 16) = x"001D"
 		   or key_code(47 downto 32) = x"001D"	then -- tecla 'W' pressionada
-				if pos_PAD2 > 3 then -- PAD2 nao está no limite superior
-					pos_PAD2 <= pos_PAD2 + 1;
+				if pos_PAD1 > 3 then -- PAD2 nao está no limite superior
+					pos_PAD1 <= pos_PAD1 - 1;
 				end if;
 			end if;
 			if key_code(15 downto 0) = x"001B" or key_code(31 downto 16) = x"001B"
 		   or key_code(47 downto 32) = x"001B"	then -- tecla 'S' pressionada
-				if pos_PAD2 < 92 then -- PAD2 nao está no limite inferior
-					pos_PAD2 <= pos_PAD2 - 1;
+				if pos_PAD1 < 92 then -- PAD2 nao está no limite inferior
+					pos_PAD1 <= pos_PAD1 + 1;
 				end if;
 			end if;
       end if;
@@ -331,9 +356,1026 @@ begin  -- comportamento
   -- posição da bola (sinais pos_bola_x e pos_bola_y) ou com a posição dos PADs.
   -- Caso contrário, o pixel é preto.
 
-  pixel_bit <= '1' when ((col = pos_bola_x) and (line = pos_bola_y)) 
-					or ((abs(line-pos_PAD1) < 4) and col = 0)
-					or ((abs(line-pos_PAD2) < 4) and col = 127) else '0';
+	-- Matriz 5x5 eh o suficiente para mostrar os 8 primeiros algarismos na tela
+	-- (0,0) (0,1) (0,2) (0,3) (0,4) (0,5)
+	-- (1,0) (1,1) (1,2) (1,3) (1,4) (1,5)
+	-- (2,0) (2,1) (2,2) (2,3) (2,4) (2,5)
+	-- (3,0) (3,1) (3,2) (3,3) (3,4) (3,5)
+	-- (4,0) (4,1) (4,2) (4,3) (4,4) (4,5)
+	-- (5,0) (5,1) (5,2) (5,3) (5,4) (5,5)
+
+	process(CLOCK_50)
+	begin
+		if pontos_PAD1 = 0 then
+			       display_placar1(0, 0) <= '0' ;-- preto
+					 display_placar1(0,1) <= '1' ;-- branco
+					 display_placar1(0,2) <= '1';
+					 display_placar1(0,3) <= '1';
+					 display_placar1(0,4) <= '0';
+					 display_placar1(1,0) <= '1';
+					 display_placar1(1,1) <= '0';
+					 display_placar1(1,2) <= '0';
+					 display_placar1(1,3) <= '0';
+					 display_placar1(1,4) <= '1';
+					 display_placar1(2,0) <= '1';
+					 display_placar1(2,1) <= '0';
+					 display_placar1(2,2) <= '0';
+					 display_placar1(2,3) <= '0';
+					 display_placar1(2,4) <= '1';
+					 display_placar1(3,0) <= '1';
+					 display_placar1(3,1) <= '0';
+					 display_placar1(3,2) <= '0';
+					 display_placar1(3,3) <= '0';
+					 display_placar1(3,4) <= '1';				 
+					 display_placar1(4,0) <= '0';
+					 display_placar1(4,1) <= '1';
+					 display_placar1(4,2) <= '1';
+					 display_placar1(4,3) <= '1';
+					 display_placar1(4,4) <= '0';
+		end if;			 
+		if pontos_PAD2 = 0 then
+			       display_placar2(0, 0) <= '0' ;-- preto
+					 display_placar2(0,1) <= '1' ;-- branco
+					 display_placar2(0,2) <= '1';
+					 display_placar2(0,3) <= '1';
+					 display_placar2(0,4) <= '0';
+					 display_placar2(1,0) <= '1';
+					 display_placar2(1,1) <= '0';
+					 display_placar2(1,2) <= '0';
+					 display_placar2(1,3) <= '0';
+					 display_placar2(1,4) <= '1';
+					 display_placar2(2,0) <= '1';
+					 display_placar2(2,1) <= '0';
+					 display_placar2(2,2) <= '0';
+					 display_placar2(2,3) <= '0';
+					 display_placar2(2,4) <= '1';
+					 display_placar2(3,0) <= '1';
+					 display_placar2(3,1) <= '0';
+					 display_placar2(3,2) <= '0';
+					 display_placar2(3,3) <= '0';
+					 display_placar2(3,4) <= '1';				 
+					 display_placar2(4,0) <= '0';
+					 display_placar2(4,1) <= '1';
+					 display_placar2(4,2) <= '1';
+					 display_placar2(4,3) <= '1';
+					 display_placar2(4,4) <= '0';
+		end if;
+		if pontos_PAD1 = 1 then
+			       display_placar1(0,0) <= '0' ;-- preto
+					 display_placar1(0,1) <= '0' ;-- branco
+					 display_placar1(0,2) <= '1';
+					 display_placar1(0,3) <= '1';
+					 display_placar1(0,4) <= '0';
+					 
+					 display_placar1(1,0) <= '0';
+					 display_placar1(1,1) <= '0';
+					 display_placar1(1,2) <= '0';
+					 display_placar1(1,3) <= '1';
+					 display_placar1(1,4) <= '0';
+					 
+					 display_placar1(2,0) <= '0';
+					 display_placar1(2,1) <= '0';
+					 display_placar1(2,2) <= '0';
+					 display_placar1(2,3) <= '1';
+					 display_placar1(2,4) <= '0';
+					 
+					 display_placar1(3,0) <= '0';
+					 display_placar1(3,1) <= '0';
+					 display_placar1(3,2) <= '0';
+					 display_placar1(3,3) <= '1';
+					 display_placar1(3,4) <= '0';
+					 
+					 display_placar1(4,0) <= '0';
+					 display_placar1(4,1) <= '0';
+					 display_placar1(4,2) <= '0';
+					 display_placar1(4,3) <= '1';
+					 display_placar1(4,4) <= '0';
+		end if;	
+	if pontos_PAD2 = 1 then
+			       display_placar2(0,0) <= '0' ;-- preto
+					 display_placar2(0,1) <= '0' ;-- branco
+					 display_placar2(0,2) <= '1';
+					 display_placar2(0,3) <= '1';
+					 display_placar2(0,4) <= '0';
+					 
+					 display_placar2(1,0) <= '0';
+					 display_placar2(1,1) <= '0';
+					 display_placar2(1,2) <= '0';
+					 display_placar2(1,3) <= '1';
+					 display_placar2(1,4) <= '0';
+					 
+					 display_placar2(2,0) <= '0';
+					 display_placar2(2,1) <= '0';
+					 display_placar2(2,2) <= '0';
+					 display_placar2(2,3) <= '1';
+					 display_placar2(2,4) <= '0';
+					 
+					 display_placar2(3,0) <= '0';
+					 display_placar2(3,1) <= '0';
+					 display_placar2(3,2) <= '0';
+					 display_placar2(3,3) <= '1';
+					 display_placar2(3,4) <= '0';
+					 
+					 display_placar2(4,0) <= '0';
+					 display_placar2(4,1) <= '0';
+					 display_placar2(4,2) <= '0';
+					 display_placar2(4,3) <= '1';
+					 display_placar2(4,4) <= '0';
+		end if;	
+		if pontos_PAD1 = 2 then
+			       display_placar1(0,0) <= '1' ;-- preto
+					 display_placar1(0,1) <= '1' ;-- branco
+					 display_placar1(0,2) <= '1';
+					 display_placar1(0,3) <= '1';
+					 display_placar1(0,4) <= '0';
+					 
+					 display_placar1(1,0) <= '0';
+					 display_placar1(1,1) <= '0';
+					 display_placar1(1,2) <= '0';
+					 display_placar1(1,3) <= '0';
+					 display_placar1(1,4) <= '1';
+					 
+					 display_placar1(2,0) <= '0';
+					 display_placar1(2,1) <= '1';
+					 display_placar1(2,2) <= '1';
+					 display_placar1(2,3) <= '1';
+					 display_placar1(2,4) <= '1';
+					 
+					 display_placar1(3,0) <= '1';
+					 display_placar1(3,1) <= '0';
+					 display_placar1(3,2) <= '0';
+					 display_placar1(3,3) <= '0';
+					 display_placar1(3,4) <= '0';
+					 
+					 display_placar1(4,0) <= '1';
+					 display_placar1(4,1) <= '1';
+					 display_placar1(4,2) <= '1';
+					 display_placar1(4,3) <= '1';
+					 display_placar1(4,4) <= '1';
+		end if;
+		if pontos_PAD2 = 2 then
+			       display_placar2(0,0) <= '1' ;-- preto
+					 display_placar2(0,1) <= '1' ;-- branco
+					 display_placar2(0,2) <= '1';
+					 display_placar2(0,3) <= '1';
+					 display_placar2(0,4) <= '0';
+					 
+					 display_placar2(1,0) <= '0';
+					 display_placar2(1,1) <= '0';
+					 display_placar2(1,2) <= '0';
+					 display_placar2(1,3) <= '0';
+					 display_placar2(1,4) <= '1';
+					 
+					 display_placar2(2,0) <= '0';
+					 display_placar2(2,1) <= '1';
+					 display_placar2(2,2) <= '1';
+					 display_placar2(2,3) <= '1';
+					 display_placar2(2,4) <= '1';
+					 
+					 display_placar2(3,0) <= '1';
+					 display_placar2(3,1) <= '0';
+					 display_placar2(3,2) <= '0';
+					 display_placar2(3,3) <= '0';
+					 display_placar2(3,4) <= '0';
+					 
+					 display_placar2(4,0) <= '1';
+					 display_placar2(4,1) <= '1';
+					 display_placar2(4,2) <= '1';
+					 display_placar2(4,3) <= '1';
+					 display_placar2(4,4) <= '1';
+		end if;
+		if pontos_PAD1 = 3 then
+			       display_placar1(0,0) <= '1' ;-- preto
+					 display_placar1(0,1) <= '1' ;-- branco
+					 display_placar1(0,2) <= '1';
+					 display_placar1(0,3) <= '1';
+					 display_placar1(0,4) <= '0';
+					 
+					 display_placar1(1,0) <= '0';
+					 display_placar1(1,1) <= '0';
+					 display_placar1(1,2) <= '0';
+					 display_placar1(1,3) <= '0';
+					 display_placar1(1,4) <= '1';
+					 
+					 display_placar1(2,0) <= '0';
+					 display_placar1(2,1) <= '1';
+					 display_placar1(2,2) <= '1';
+					 display_placar1(2,3) <= '1';
+					 display_placar1(2,4) <= '1';
+					 
+					 display_placar1(3,0) <= '0';
+					 display_placar1(3,1) <= '0';
+					 display_placar1(3,2) <= '0';
+					 display_placar1(3,3) <= '0';
+					 display_placar1(3,4) <= '1';
+					 
+					 display_placar1(4,0) <= '1';
+					 display_placar1(4,1) <= '1';
+					 display_placar1(4,2) <= '1';
+					 display_placar1(4,3) <= '1';
+					 display_placar1(4,4) <= '0';
+		end if;
+		if pontos_PAD2 = 3 then
+			       display_placar2(0,0) <= '1' ;-- preto
+					 display_placar2(0,1) <= '1' ;-- branco
+					 display_placar2(0,2) <= '1';
+					 display_placar2(0,3) <= '1';
+					 display_placar2(0,4) <= '0';
+					 
+					 display_placar2(1,0) <= '0';
+					 display_placar2(1,1) <= '0';
+					 display_placar2(1,2) <= '0';
+					 display_placar2(1,3) <= '0';
+					 display_placar2(1,4) <= '1';
+					 
+					 display_placar2(2,0) <= '0';
+					 display_placar2(2,1) <= '1';
+					 display_placar2(2,2) <= '1';
+					 display_placar2(2,3) <= '1';
+					 display_placar2(2,4) <= '1';
+					 
+					 display_placar2(3,0) <= '0';
+					 display_placar2(3,1) <= '0';
+					 display_placar2(3,2) <= '0';
+					 display_placar2(3,3) <= '0';
+					 display_placar2(3,4) <= '1';
+					 
+					 display_placar2(4,0) <= '1';
+					 display_placar2(4,1) <= '1';
+					 display_placar2(4,2) <= '1';
+					 display_placar2(4,3) <= '1';
+					 display_placar2(4,4) <= '0';
+		end if;
+		if pontos_PAD1 = 4 then
+			       display_placar1(0,0) <= '1' ;-- preto
+					 display_placar1(0,1) <= '0' ;-- branco
+					 display_placar1(0,2) <= '0';
+					 display_placar1(0,3) <= '0';
+					 display_placar1(0,4) <= '1';
+					 
+					 display_placar1(1,0) <= '1';
+					 display_placar1(1,1) <= '0';
+					 display_placar1(1,2) <= '0';
+					 display_placar1(1,3) <= '0';
+					 display_placar1(1,4) <= '1';
+					 
+					 display_placar1(2,0) <= '1';
+					 display_placar1(2,1) <= '1';
+					 display_placar1(2,2) <= '1';
+					 display_placar1(2,3) <= '1';
+					 display_placar1(2,4) <= '1';
+					 
+					 display_placar1(3,0) <= '0';
+					 display_placar1(3,1) <= '0';
+					 display_placar1(3,2) <= '0';
+					 display_placar1(3,3) <= '0';
+					 display_placar1(3,4) <= '1';
+					 
+					 display_placar1(4,0) <= '0';
+					 display_placar1(4,1) <= '0';
+					 display_placar1(4,2) <= '0';
+					 display_placar1(4,3) <= '0';
+					 display_placar1(4,4) <= '1';
+		end if;
+		if pontos_PAD2 = 4 then
+			       display_placar2(0,0) <= '1' ;-- preto
+					 display_placar2(0,1) <= '0' ;-- branco
+					 display_placar2(0,2) <= '0';
+					 display_placar2(0,3) <= '0';
+					 display_placar2(0,4) <= '1';
+					 
+					 display_placar2(1,0) <= '1';
+					 display_placar2(1,1) <= '0';
+					 display_placar2(1,2) <= '0';
+					 display_placar2(1,3) <= '0';
+					 display_placar2(1,4) <= '1';
+					 
+					 display_placar2(2,0) <= '1';
+					 display_placar2(2,1) <= '1';
+					 display_placar2(2,2) <= '1';
+					 display_placar2(2,3) <= '1';
+					 display_placar2(2,4) <= '1';
+					 
+					 display_placar2(3,0) <= '0';
+					 display_placar2(3,1) <= '0';
+					 display_placar2(3,2) <= '0';
+					 display_placar2(3,3) <= '0';
+					 display_placar2(3,4) <= '1';
+					 
+					 display_placar2(4,0) <= '0';
+					 display_placar2(4,1) <= '0';
+					 display_placar2(4,2) <= '0';
+					 display_placar2(4,3) <= '0';
+					 display_placar2(4,4) <= '1';
+		end if;
+		if pontos_PAD1 = 5 then
+			       display_placar1(0,0) <= '1' ;-- preto
+					 display_placar1(0,1) <= '1' ;-- branco
+					 display_placar1(0,2) <= '1';
+					 display_placar1(0,3) <= '1';
+					 display_placar1(0,4) <= '1';
+					 
+					 display_placar1(1,0) <= '1';
+					 display_placar1(1,1) <= '0';
+					 display_placar1(1,2) <= '0';
+					 display_placar1(1,3) <= '0';
+					 display_placar1(1,4) <= '0';
+					 
+					 display_placar1(2,0) <= '1';
+					 display_placar1(2,1) <= '1';
+					 display_placar1(2,2) <= '1';
+					 display_placar1(2,3) <= '1';
+					 display_placar1(2,4) <= '0';
+					 
+					 display_placar1(3,0) <= '0';
+					 display_placar1(3,1) <= '0';
+					 display_placar1(3,2) <= '0';
+					 display_placar1(3,3) <= '0';
+					 display_placar1(3,4) <= '1';
+					 
+					 display_placar1(4,0) <= '1';
+					 display_placar1(4,1) <= '1';
+					 display_placar1(4,2) <= '1';
+					 display_placar1(4,3) <= '1';
+					 display_placar1(4,4) <= '0';
+		end if;
+		if pontos_PAD2 = 5 then
+			       display_placar2(0,0) <= '1' ;-- preto
+					 display_placar2(0,1) <= '1' ;-- branco
+					 display_placar2(0,2) <= '1';
+					 display_placar2(0,3) <= '1';
+					 display_placar2(0,4) <= '1';
+					 
+					 display_placar2(1,0) <= '1';
+					 display_placar2(1,1) <= '0';
+					 display_placar2(1,2) <= '0';
+					 display_placar2(1,3) <= '0';
+					 display_placar2(1,4) <= '0';
+					 
+					 display_placar2(2,0) <= '1';
+					 display_placar2(2,1) <= '1';
+					 display_placar2(2,2) <= '1';
+					 display_placar2(2,3) <= '1';
+					 display_placar2(2,4) <= '0';
+					 
+					 display_placar2(3,0) <= '0';
+					 display_placar2(3,1) <= '0';
+					 display_placar2(3,2) <= '0';
+					 display_placar2(3,3) <= '0';
+					 display_placar2(3,4) <= '1';
+					 
+					 display_placar2(4,0) <= '1';
+					 display_placar2(4,1) <= '1';
+					 display_placar2(4,2) <= '1';
+					 display_placar2(4,3) <= '1';
+					 display_placar2(4,4) <= '0';
+		end if;
+		if pontos_PAD1 = 6 then
+			       display_placar1(0,0) <= '0' ;-- preto
+					 display_placar1(0,1) <= '1' ;-- branco
+					 display_placar1(0,2) <= '1';
+					 display_placar1(0,3) <= '1';
+					 display_placar1(0,4) <= '0';
+					 
+					 display_placar1(1,0) <= '1';
+					 display_placar1(1,1) <= '0';
+					 display_placar1(1,2) <= '0';
+					 display_placar1(1,3) <= '0';
+					 display_placar1(1,4) <= '0';
+					 
+					 display_placar1(2,0) <= '1';
+					 display_placar1(2,1) <= '1';
+					 display_placar1(2,2) <= '1';
+					 display_placar1(2,3) <= '1';
+					 display_placar1(2,4) <= '0';
+					 
+					 display_placar1(3,0) <= '1';
+					 display_placar1(3,1) <= '0';
+					 display_placar1(3,2) <= '0';
+					 display_placar1(3,3) <= '0';
+					 display_placar1(3,4) <= '1';
+					 
+					 display_placar1(4,0) <= '0';
+					 display_placar1(4,1) <= '1';
+					 display_placar1(4,2) <= '1';
+					 display_placar1(4,3) <= '1';
+					 display_placar1(4,4) <= '0';
+		end if;
+		if pontos_PAD2 = 6 then
+			       display_placar2(0,0) <= '0' ;-- preto
+					 display_placar2(0,1) <= '1' ;-- branco
+					 display_placar2(0,2) <= '1';
+					 display_placar2(0,3) <= '1';
+					 display_placar2(0,4) <= '0';
+					 
+					 display_placar2(1,0) <= '1';
+					 display_placar2(1,1) <= '0';
+					 display_placar2(1,2) <= '0';
+					 display_placar2(1,3) <= '0';
+					 display_placar2(1,4) <= '0';
+					 
+					 display_placar2(2,0) <= '1';
+					 display_placar2(2,1) <= '1';
+					 display_placar2(2,2) <= '1';
+					 display_placar2(2,3) <= '1';
+					 display_placar2(2,4) <= '0';
+					 
+					 display_placar2(3,0) <= '1';
+					 display_placar2(3,1) <= '0';
+					 display_placar2(3,2) <= '0';
+					 display_placar2(3,3) <= '0';
+					 display_placar2(3,4) <= '1';
+					 
+					 display_placar2(4,0) <= '0';
+					 display_placar2(4,1) <= '1';
+					 display_placar2(4,2) <= '1';
+					 display_placar2(4,3) <= '1';
+					 display_placar2(4,4) <= '0';
+		end if;
+		if pontos_PAD1 = 7 then
+			       display_placar1(0,0) <= '1' ;-- preto
+					 display_placar1(0,1) <= '1' ;-- branco
+					 display_placar1(0,2) <= '1';
+					 display_placar1(0,3) <= '1';
+					 display_placar1(0,4) <= '1';
+					 
+					 display_placar1(1,0) <= '0';
+					 display_placar1(1,1) <= '0';
+					 display_placar1(1,2) <= '0';
+					 display_placar1(1,3) <= '0';
+					 display_placar1(1,4) <= '1';
+					 
+					 display_placar1(2,0) <= '0';
+					 display_placar1(2,1) <= '0';
+					 display_placar1(2,2) <= '0';
+					 display_placar1(2,3) <= '0';
+					 display_placar1(2,4) <= '1';
+					 
+					 display_placar1(3,0) <= '0';
+					 display_placar1(3,1) <= '0';
+					 display_placar1(3,2) <= '0';
+					 display_placar1(3,3) <= '1';
+					 display_placar1(3,4) <= '0';
+					 
+					 display_placar1(4,0) <= '0';
+					 display_placar1(4,1) <= '0';
+					 display_placar1(4,2) <= '0';
+					 display_placar1(4,3) <= '1';
+					 display_placar1(4,4) <= '0';
+		end if;
+		if pontos_PAD2 = 7 then
+			       display_placar2(0,0) <= '1' ;-- preto
+					 display_placar2(0,1) <= '1' ;-- branco
+					 display_placar2(0,2) <= '1';
+					 display_placar2(0,3) <= '1';
+					 display_placar2(0,4) <= '1';
+					 
+					 display_placar2(1,0) <= '0';
+					 display_placar2(1,1) <= '0';
+					 display_placar2(1,2) <= '0';
+					 display_placar2(1,3) <= '0';
+					 display_placar2(1,4) <= '1';
+					 
+					 display_placar2(2,0) <= '0';
+					 display_placar2(2,1) <= '0';
+					 display_placar2(2,2) <= '0';
+					 display_placar2(2,3) <= '0';
+					 display_placar2(2,4) <= '1';
+					 
+					 display_placar2(3,0) <= '0';
+					 display_placar2(3,1) <= '0';
+					 display_placar2(3,2) <= '0';
+					 display_placar2(3,3) <= '1';
+					 display_placar2(3,4) <= '0';
+					 
+					 display_placar2(4,0) <= '0';
+					 display_placar2(4,1) <= '0';
+					 display_placar2(4,2) <= '0';
+					 display_placar2(4,3) <= '1';
+					 display_placar2(4,4) <= '0';
+		end if;
+	end process;
+	
+	process(flag_inicio)
+	begin
+		if flag_inicio = '0' then
+			display_mensagem(0,0) <= '1'; --A
+			display_mensagem(1,0) <= '1';
+			display_mensagem(2,0) <= '1';
+			display_mensagem(3,0) <= '1';
+			display_mensagem(4,0) <= '1';
+			display_mensagem(0,1) <= '1';
+			display_mensagem(1,1) <= '0';
+			display_mensagem(2,1) <= '1';
+			display_mensagem(3,1) <= '0';
+			display_mensagem(4,1) <= '0';
+			display_mensagem(0,2) <= '1';
+			display_mensagem(1,2) <= '1';
+			display_mensagem(2,2) <= '1';
+			display_mensagem(3,2) <= '1';
+			display_mensagem(4,2) <= '1';
+			
+			display_mensagem(0,3) <= '0';
+			display_mensagem(1,3) <= '0';
+			display_mensagem(2,3) <= '0';
+			display_mensagem(3,3) <= '0';
+			display_mensagem(4,3) <= '0';
+			
+			display_mensagem(0,4) <= '1'; --P
+			display_mensagem(1,4) <= '1';
+			display_mensagem(2,4) <= '1';
+			display_mensagem(3,4) <= '1';
+			display_mensagem(4,4) <= '1';
+			display_mensagem(0,5) <= '1';
+			display_mensagem(1,5) <= '0';
+			display_mensagem(2,5) <= '1';
+			display_mensagem(3,5) <= '0';
+			display_mensagem(4,5) <= '0';
+			display_mensagem(0,6) <= '1';
+			display_mensagem(1,6) <= '1';
+			display_mensagem(2,6) <= '1';
+			display_mensagem(3,6) <= '0';
+			display_mensagem(4,6) <= '0';
+			
+			display_mensagem(0,7) <= '0';
+			display_mensagem(1,7) <= '0';
+			display_mensagem(2,7) <= '0';
+			display_mensagem(3,7) <= '0';
+			display_mensagem(4,7) <= '0';
+			
+			display_mensagem(0,8) <= '1'; --E
+			display_mensagem(1,8) <= '1';
+			display_mensagem(2,8) <= '1';
+			display_mensagem(3,8) <= '1';
+			display_mensagem(4,8) <= '1';
+			display_mensagem(0,9) <= '1';
+			display_mensagem(1,9) <= '0';
+			display_mensagem(2,9) <= '1';
+			display_mensagem(3,9) <= '0';
+			display_mensagem(4,9) <= '1';
+			display_mensagem(0,10) <= '1';
+			display_mensagem(1,10) <= '0';
+			display_mensagem(2,10) <= '0';
+			display_mensagem(3,10) <= '0';
+			display_mensagem(4,10) <= '1';
+			
+			display_mensagem(0,11) <= '0';
+			display_mensagem(1,11) <= '0';
+			display_mensagem(2,11) <= '0';
+			display_mensagem(3,11) <= '0';
+			display_mensagem(4,11) <= '0';
+			
+			display_mensagem(0,12) <= '1'; --R
+			display_mensagem(1,12) <= '1';
+			display_mensagem(2,12) <= '1';
+			display_mensagem(3,12) <= '1';
+			display_mensagem(4,12) <= '1';
+			display_mensagem(0,13) <= '1';
+			display_mensagem(1,13) <= '0';
+			display_mensagem(2,13) <= '1';
+			display_mensagem(3,13) <= '1';
+			display_mensagem(4,13) <= '0';
+			display_mensagem(0,14) <= '1';
+			display_mensagem(1,14) <= '1';
+			display_mensagem(2,14) <= '1';
+			display_mensagem(3,14) <= '0';
+			display_mensagem(4,14) <= '1';
+			
+			display_mensagem(0,15) <= '0';
+			display_mensagem(1,15) <= '0';
+			display_mensagem(2,15) <= '0';
+			display_mensagem(3,15) <= '0';
+			display_mensagem(4,15) <= '0';
+			
+			display_mensagem(0,16) <= '1'; --T
+			display_mensagem(1,16) <= '0';
+			display_mensagem(2,16) <= '0';
+			display_mensagem(3,16) <= '0';
+			display_mensagem(4,16) <= '0';
+			display_mensagem(0,17) <= '1';
+			display_mensagem(1,17) <= '1';
+			display_mensagem(2,17) <= '1';
+			display_mensagem(3,17) <= '1';
+			display_mensagem(4,17) <= '1';
+			display_mensagem(0,18) <= '1';
+			display_mensagem(1,18) <= '0';
+			display_mensagem(2,18) <= '0';
+			display_mensagem(3,18) <= '0';
+			display_mensagem(4,18) <= '0';
+			
+			display_mensagem(0,19) <= '0';
+			display_mensagem(1,19) <= '0';
+			display_mensagem(2,19) <= '0';
+			display_mensagem(3,19) <= '0';
+			display_mensagem(4,19) <= '0';
+			
+			display_mensagem(0,20) <= '1'; --E
+			display_mensagem(1,20) <= '1';
+			display_mensagem(2,20) <= '1';
+			display_mensagem(3,20) <= '1';
+			display_mensagem(4,20) <= '1';
+			display_mensagem(0,21) <= '1';
+			display_mensagem(1,21) <= '0';
+			display_mensagem(2,21) <= '1';
+			display_mensagem(3,21) <= '0';
+			display_mensagem(4,21) <= '1';
+			display_mensagem(0,22) <= '1';
+			display_mensagem(1,22) <= '0';
+			display_mensagem(2,22) <= '0';
+			display_mensagem(3,22) <= '0';
+			display_mensagem(4,22) <= '1';
+			
+			display_mensagem(0,23) <= '0'; --espaco
+			display_mensagem(1,23) <= '0';
+			display_mensagem(2,23) <= '0';
+			display_mensagem(3,23) <= '0';
+			display_mensagem(4,23) <= '0';
+			display_mensagem(0,24) <= '0';
+			display_mensagem(1,24) <= '0';
+			display_mensagem(2,24) <= '0';
+			display_mensagem(3,24) <= '0';
+			display_mensagem(4,24) <= '0';
+			display_mensagem(0,25) <= '0';
+			display_mensagem(1,25) <= '0';
+			display_mensagem(2,25) <= '0';
+			display_mensagem(3,25) <= '0';
+			display_mensagem(4,25) <= '0';
+			display_mensagem(0,26) <= '0';
+			display_mensagem(1,26) <= '0';
+			display_mensagem(2,26) <= '0';
+			display_mensagem(3,26) <= '0';
+			display_mensagem(4,26) <= '0';
+			display_mensagem(0,27) <= '0';
+			display_mensagem(1,27) <= '0';
+			display_mensagem(2,27) <= '0';
+			display_mensagem(3,27) <= '0';
+			display_mensagem(4,27) <= '0';
+			
+			display_mensagem(0,28) <= '1'; --E
+			display_mensagem(1,28) <= '1';
+			display_mensagem(2,28) <= '1';
+			display_mensagem(3,28) <= '1';
+			display_mensagem(4,28) <= '1';
+			display_mensagem(0,29) <= '1';
+			display_mensagem(1,29) <= '0';
+			display_mensagem(2,29) <= '1';
+			display_mensagem(3,29) <= '0';
+			display_mensagem(4,29) <= '1';
+			display_mensagem(0,30) <= '1';
+			display_mensagem(1,30) <= '0';
+			display_mensagem(2,30) <= '0';
+			display_mensagem(3,30) <= '0';
+			display_mensagem(4,30) <= '1';
+			
+			display_mensagem(0,31) <= '0';
+			display_mensagem(1,31) <= '0';
+			display_mensagem(2,31) <= '0';
+			display_mensagem(3,31) <= '0';
+			display_mensagem(4,31) <= '0';
+			
+			display_mensagem(0,32) <= '1'; --N
+			display_mensagem(1,32) <= '1';
+			display_mensagem(2,32) <= '1';
+			display_mensagem(3,32) <= '1';
+			display_mensagem(4,32) <= '1';
+			display_mensagem(0,33) <= '1';
+			display_mensagem(1,33) <= '0';
+			display_mensagem(2,33) <= '0';
+			display_mensagem(3,33) <= '0';
+			display_mensagem(4,33) <= '0';
+			display_mensagem(0,34) <= '1';
+			display_mensagem(1,34) <= '1';
+			display_mensagem(2,34) <= '1';
+			display_mensagem(3,34) <= '1';
+			display_mensagem(4,34) <= '1';
+			
+			display_mensagem(0,35) <= '0';
+			display_mensagem(1,35) <= '0';
+			display_mensagem(2,35) <= '0';
+			display_mensagem(3,35) <= '0';
+			display_mensagem(4,35) <= '0';
+			
+			display_mensagem(0,36) <= '1'; --T
+			display_mensagem(1,36) <= '0';
+			display_mensagem(2,36) <= '0';
+			display_mensagem(3,36) <= '0';
+			display_mensagem(4,36) <= '0';
+			display_mensagem(0,37) <= '1';
+			display_mensagem(1,37) <= '1';
+			display_mensagem(2,37) <= '1';
+			display_mensagem(3,37) <= '1';
+			display_mensagem(4,37) <= '1';
+			display_mensagem(0,38) <= '1';
+			display_mensagem(1,38) <= '0';
+			display_mensagem(2,38) <= '0';
+			display_mensagem(3,38) <= '0';
+			display_mensagem(4,38) <= '0';
+			
+			display_mensagem(0,39) <= '0';
+			display_mensagem(1,39) <= '0';
+			display_mensagem(2,39) <= '0';
+			display_mensagem(3,39) <= '0';
+			display_mensagem(4,39) <= '0';
+			
+			display_mensagem(0,40) <= '1'; --E
+			display_mensagem(1,40) <= '1';
+			display_mensagem(2,40) <= '1';
+			display_mensagem(3,40) <= '1';
+			display_mensagem(4,40) <= '1';
+			display_mensagem(0,41) <= '1';
+			display_mensagem(1,41) <= '0';
+			display_mensagem(2,41) <= '1';
+			display_mensagem(3,41) <= '0';
+			display_mensagem(4,41) <= '1';
+			display_mensagem(0,42) <= '1';
+			display_mensagem(1,42) <= '0';
+			display_mensagem(2,42) <= '0';
+			display_mensagem(3,42) <= '0';
+			display_mensagem(4,42) <= '1';
+			
+			display_mensagem(0,43) <= '0';
+			display_mensagem(1,43) <= '0';
+			display_mensagem(2,43) <= '0';
+			display_mensagem(3,43) <= '0';
+			display_mensagem(4,43) <= '0';
+			
+			display_mensagem(0,44) <= '1'; --R
+			display_mensagem(1,44) <= '1';
+			display_mensagem(2,44) <= '1';
+			display_mensagem(3,44) <= '1';
+			display_mensagem(4,44) <= '1';
+			display_mensagem(0,45) <= '1';
+			display_mensagem(1,45) <= '0';
+			display_mensagem(2,45) <= '1';
+			display_mensagem(3,45) <= '1';
+			display_mensagem(4,45) <= '0';
+			display_mensagem(0,46) <= '1';
+			display_mensagem(1,46) <= '1';
+			display_mensagem(2,46) <= '1';
+			display_mensagem(3,46) <= '0';
+			display_mensagem(4,46) <= '1';
+			
+			
+		else
+			display_mensagem(0,0) <= '0';
+		end if;
+	end process;
+	
+	process(flag_fim)
+	begin
+		if flag_fim = '1' then
+		if pontos_PAD1 >= 6 then
+			display_mensagem(0,0) <= '1'; --P
+			display_mensagem(1,0) <= '1';
+			display_mensagem(2,0) <= '1';
+			display_mensagem(3,0) <= '1';
+			display_mensagem(4,0) <= '1';
+			display_mensagem(0,1) <= '1';
+			display_mensagem(1,1) <= '0';
+			display_mensagem(2,1) <= '1';
+			display_mensagem(3,1) <= '0';
+			display_mensagem(4,1) <= '0';
+			display_mensagem(0,2) <= '1';
+			display_mensagem(1,2) <= '1';
+			display_mensagem(2,2) <= '1';
+			display_mensagem(3,2) <= '0';
+			display_mensagem(4,2) <= '0';
+			
+			display_mensagem(0,3) <= '0';
+			display_mensagem(1,3) <= '0';
+			display_mensagem(2,3) <= '0';
+			display_mensagem(3,3) <= '0';
+			display_mensagem(4,3) <= '0';
+			
+			display_mensagem(0,4) <= '0'; --1
+			display_mensagem(1,4) <= '1';
+			display_mensagem(2,4) <= '0';
+			display_mensagem(3,4) <= '0';
+			display_mensagem(4,4) <= '1';
+			display_mensagem(0,5) <= '1';
+			display_mensagem(1,5) <= '1';
+			display_mensagem(2,5) <= '1';
+			display_mensagem(3,5) <= '1';
+			display_mensagem(4,5) <= '1';
+			display_mensagem(0,6) <= '0';
+			display_mensagem(1,6) <= '0';
+			display_mensagem(2,6) <= '0';
+			display_mensagem(3,6) <= '0';
+			display_mensagem(4,6) <= '1';
+			
+			display_mensagem(0,7) <= '0'; --espaco
+			display_mensagem(1,7) <= '0';
+			display_mensagem(2,7) <= '0';
+			display_mensagem(3,7) <= '0';
+			display_mensagem(4,7) <= '0';
+			display_mensagem(0,8) <= '0';
+			display_mensagem(1,8) <= '0';
+			display_mensagem(2,8) <= '0';
+			display_mensagem(3,8) <= '0';
+			display_mensagem(4,8) <= '0';
+			display_mensagem(0,9) <= '0';
+			display_mensagem(1,9) <= '0';
+			display_mensagem(2,9) <= '0';
+			display_mensagem(3,9) <= '0';
+			display_mensagem(4,9) <= '0';
+			display_mensagem(0,10) <= '0';
+			display_mensagem(1,10) <= '0';
+			display_mensagem(2,10) <= '0';
+			display_mensagem(3,10) <= '0';
+			display_mensagem(4,10) <= '0';
+			display_mensagem(0,11) <= '0';
+			display_mensagem(1,11) <= '0';
+			display_mensagem(2,11) <= '0';
+			display_mensagem(3,11) <= '0';
+			display_mensagem(4,11) <= '0';
+			
+			display_mensagem(0,12) <= '1'; --G
+			display_mensagem(1,12) <= '1';
+			display_mensagem(2,12) <= '1';
+			display_mensagem(3,12) <= '1';
+			display_mensagem(4,12) <= '1';
+			display_mensagem(0,13) <= '1';
+			display_mensagem(1,13) <= '0';
+			display_mensagem(2,13) <= '1';
+			display_mensagem(3,13) <= '0';
+			display_mensagem(4,13) <= '1';
+			display_mensagem(0,14) <= '0';
+			display_mensagem(1,14) <= '0';
+			display_mensagem(2,14) <= '1';
+			display_mensagem(3,14) <= '1';
+			display_mensagem(4,14) <= '1';
+			
+			display_mensagem(0,15) <= '0';
+			display_mensagem(1,15) <= '0';
+			display_mensagem(2,15) <= '0';
+			display_mensagem(3,15) <= '0';
+			display_mensagem(4,15) <= '0';
+			
+			display_mensagem(0,16) <= '1'; --A
+			display_mensagem(1,16) <= '1';
+			display_mensagem(2,16) <= '1';
+			display_mensagem(3,16) <= '1';
+			display_mensagem(4,16) <= '1';
+			display_mensagem(0,17) <= '1';
+			display_mensagem(1,17) <= '0';
+			display_mensagem(2,17) <= '1';
+			display_mensagem(3,17) <= '0';
+			display_mensagem(4,17) <= '0';
+			display_mensagem(0,18) <= '1';
+			display_mensagem(1,18) <= '1';
+			display_mensagem(2,18) <= '1';
+			display_mensagem(3,18) <= '1';
+			display_mensagem(4,18) <= '1';
+			
+			display_mensagem(0,19) <= '0';
+			display_mensagem(1,19) <= '0';
+			display_mensagem(2,19) <= '0';
+			display_mensagem(3,19) <= '0';
+			display_mensagem(4,19) <= '0';
+			
+			display_mensagem(0,20) <= '1'; --N
+			display_mensagem(1,20) <= '0';
+			display_mensagem(2,20) <= '0';
+			display_mensagem(3,20) <= '0';
+			display_mensagem(4,20) <= '0';
+			display_mensagem(0,21) <= '1';
+			display_mensagem(1,21) <= '1';
+			display_mensagem(2,21) <= '1';
+			display_mensagem(3,21) <= '1';
+			display_mensagem(4,21) <= '1';
+			display_mensagem(0,22) <= '1';
+			display_mensagem(1,22) <= '0';
+			display_mensagem(2,22) <= '0';
+			display_mensagem(3,22) <= '0';
+			display_mensagem(4,22) <= '0';
+			
+			display_mensagem(0,23) <= '0';
+			display_mensagem(1,23) <= '0';
+			display_mensagem(2,23) <= '0';
+			display_mensagem(3,23) <= '0';
+			display_mensagem(4,23) <= '0';
+			
+			display_mensagem(0,24) <= '1'; --H
+			display_mensagem(1,24) <= '1';
+			display_mensagem(2,24) <= '1';
+			display_mensagem(3,24) <= '1';
+			display_mensagem(4,24) <= '1';
+			display_mensagem(0,25) <= '1';
+			display_mensagem(1,25) <= '0';
+			display_mensagem(2,25) <= '1';
+			display_mensagem(3,25) <= '0';
+			display_mensagem(4,25) <= '1';
+			display_mensagem(0,26) <= '1';
+			display_mensagem(1,26) <= '0';
+			display_mensagem(2,26) <= '0';
+			display_mensagem(3,26) <= '0';
+			display_mensagem(4,26) <= '1';
+			
+			display_mensagem(0,27) <= '0';
+			display_mensagem(1,27) <= '0';
+			display_mensagem(2,27) <= '0';
+			display_mensagem(3,27) <= '0';
+			display_mensagem(4,27) <= '0';
+			
+			display_mensagem(0,28) <= '1'; --O
+			display_mensagem(1,28) <= '1';
+			display_mensagem(2,28) <= '1';
+			display_mensagem(3,28) <= '1';
+			display_mensagem(4,28) <= '1';
+			display_mensagem(0,29) <= '1';
+			display_mensagem(1,29) <= '0';
+			display_mensagem(2,29) <= '1';
+			display_mensagem(3,29) <= '0';
+			display_mensagem(4,29) <= '1';
+			display_mensagem(0,30) <= '1';
+			display_mensagem(1,30) <= '0';
+			display_mensagem(2,30) <= '0';
+			display_mensagem(3,30) <= '0';
+			display_mensagem(4,30) <= '1';
+			
+			display_mensagem(0,31) <= '0';
+			display_mensagem(1,31) <= '0';
+			display_mensagem(2,31) <= '0';
+			display_mensagem(3,31) <= '0';
+			display_mensagem(4,31) <= '0';
+			
+			display_mensagem(0,32) <= '1'; --U
+			display_mensagem(1,32) <= '1';
+			display_mensagem(2,32) <= '1';
+			display_mensagem(3,32) <= '1';
+			display_mensagem(4,32) <= '1';
+			display_mensagem(0,33) <= '1';
+			display_mensagem(1,33) <= '0';
+			display_mensagem(2,33) <= '0';
+			display_mensagem(3,33) <= '0';
+			display_mensagem(4,33) <= '0';
+			display_mensagem(0,34) <= '1';
+			display_mensagem(1,34) <= '1';
+			display_mensagem(2,34) <= '1';
+			display_mensagem(3,34) <= '1';
+			display_mensagem(4,34) <= '1';
+			
+			display_mensagem(0,35) <= '0';
+			display_mensagem(1,35) <= '0';
+			display_mensagem(2,35) <= '0';
+			display_mensagem(3,35) <= '0';
+			display_mensagem(4,35) <= '0';
+			
+			display_mensagem(0,36) <= '1'; --!
+			display_mensagem(1,36) <= '0';
+			display_mensagem(2,36) <= '0';
+			display_mensagem(3,36) <= '0';
+			display_mensagem(4,36) <= '0';
+			display_mensagem(0,37) <= '1';
+			display_mensagem(1,37) <= '1';
+			display_mensagem(2,37) <= '1';
+			display_mensagem(3,37) <= '1';
+			display_mensagem(4,37) <= '1';
+			display_mensagem(0,38) <= '1';
+			display_mensagem(1,38) <= '0';
+			display_mensagem(2,38) <= '0';
+			display_mensagem(3,38) <= '0';
+			display_mensagem(4,38) <= '0';
+			
+			else
+			
+			
+			
+			end if;
+		else
+			display_mensagem(0,0) <= '0';
+		end if;
+	end process;
+	
+	process(CLOCK_50)
+	begin
+		if CLOCK_50'event and CLOCK_50 = '1' then
+			case estado is
+				when inicio_jogo    => 
+
+				when constroi_quadro => if ((col = pos_bola_x) and (line = pos_bola_y)) 
+													or ((abs(line-pos_PAD1) < 4) and col = 10)
+													or ((abs(line-pos_PAD2) < 4) and col = 117) then
+													pixel_bit <= '1';
+												elsif ((abs(line-5) < 3) and ((abs(col-55) < 3))) then
+													pixel_bit <= display_placar1(line-3, col-53);
+												elsif ((abs(line-5) < 3) and ((abs(col-71) < 3))) then
+													pixel_bit <= display_placar2(line-3, col-69);	
+												elsif ((abs(line-25) < 3) and ((abs(col-63) < 24)) and ((flag_inicio = '0') or (flag_fim = '1')))then
+													pixel_bit <= display_mensagem(line-23, col-40);
+												else
+													pixel_bit <= '0';	
+												end if;
+												
+
+				when game_over      => pixel_bit <= '1';
+
+				when others         => pixel_bit <= pixel_bit;
+
+			end case;
+		end if;
+	end process;
+	  
   pixel <= (others => pixel_bit);
   
   -- O endereço de memória pode ser construído com essa fórmula simples,
@@ -357,7 +1399,7 @@ begin  -- comportamento
 		when inicio_jogo    => if timer = '1' then
 									    if flag_inicio = '1' then
 										   proximo_estado <= inicio_partida;
-									    else
+										 else
                                  proximo_estado <= constroi_quadro;
 										 end if;
                              else
@@ -366,6 +1408,7 @@ begin  -- comportamento
                              atualiza_pos_bola_x <= '0';
                              atualiza_pos_bola_y <= '0';
 									  atualiza_pos_PADs   <= '0';
+									  flag_inicio_rstn <= '1';
                              line_rstn      <= '0';  -- reset é active low!
                              line_enable    <= '0';
                              col_rstn       <= '0';  -- reset é active low!
@@ -382,6 +1425,7 @@ begin  -- comportamento
                              atualiza_pos_bola_x <= '0';
                              atualiza_pos_bola_y <= '0';
 									  atualiza_pos_PADs   <= '0';
+									  flag_inicio_rstn <= '1';
                              line_rstn      <= '0';  -- reset é active low!
                              line_enable    <= '0';
                              col_rstn       <= '0';  -- reset é active low!
@@ -391,13 +1435,22 @@ begin  -- comportamento
                              timer_enable   <= '1';
 
       when constroi_quadro=> if fim_escrita = '1' then
-                               proximo_estado <= move_bola_e_PADs;
+										if flag_inicio = '1' then
+											proximo_estado <= move_bola_e_PADs;
+											flag_inicio_rstn <= '1';
+										elsif flag_fim = '1' then
+											proximo_estado <= game_over;
+											flag_inicio_rstn <= '0';
+										else
+											proximo_estado <= inicio_jogo;
+											flag_inicio_rstn <= '1';
+										end if;
                              else
                                proximo_estado <= constroi_quadro;
                              end if;
                              atualiza_pos_bola_x <= '0';
                              atualiza_pos_bola_y <= '0';
-									  atualiza_pos_PADs   <= '0';
+									  atualiza_pos_PADs   <= '0';		  
                              line_rstn      <= '1';
                              line_enable    <= '1';
                              col_rstn       <= '1';
@@ -406,7 +1459,13 @@ begin  -- comportamento
                              timer_rstn     <= '0'; 
                              timer_enable   <= '0';
 
-      when move_bola_e_PADs=>proximo_estado <= inicio_partida;
+      when move_bola_e_PADs=>if flag_fim = '1' then
+										proximo_estado <= game_over;
+										flag_inicio_rstn <= '0';
+									  else
+										proximo_estado <= inicio_partida;
+										flag_inicio_rstn <= '1';
+									  end if;
                              atualiza_pos_bola_x <= '1';
                              atualiza_pos_bola_y <= '1';
 									  atualiza_pos_PADs   <= '1';
@@ -418,27 +1477,28 @@ begin  -- comportamento
                              timer_rstn     <= '0'; 
                              timer_enable   <= '0';
 		
-		when reseta_partida => if (pontos_PAD1 < 7) and (pontos_PAD2 < 7) then
-		                         proximo_estado <= inicio_partida;
+		when game_over=>       if flag_fim = '0' then
+										proximo_estado <= inicio_jogo;
 									  else
-									    proximo_estado <= game_over;
+										proximo_estado <= constroi_quadro;
 									  end if;
-		                       --pontuacao_enable <= '1';
-									  atualiza_pos_bola_x <= '0';
-                             atualiza_pos_bola_y <= '0';
-									  atualiza_pos_PADs   <= '0';
+                             atualiza_pos_bola_x <= '1';
+                             atualiza_pos_bola_y <= '1';
+									  atualiza_pos_PADs   <= '1';
+									  flag_inicio_rstn <= '0';
                              line_rstn      <= '1';
-                             line_enable    <= '1';
+                             line_enable    <= '0';
                              col_rstn       <= '1';
-                             col_enable     <= '1';
-                             we             <= '1';
+                             col_enable     <= '0';
+                             we             <= '0';
                              timer_rstn     <= '0'; 
                              timer_enable   <= '0';
-		
+									  
       when others         => proximo_estado <= inicio_partida;
                              atualiza_pos_bola_x <= '0';
                              atualiza_pos_bola_y <= '0';
 									  atualiza_pos_PADs   <= '0';
+									  flag_inicio_rstn <= '1';
                              line_rstn      <= '1';
                              line_enable    <= '0';
                              col_rstn       <= '1';
