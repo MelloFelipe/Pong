@@ -46,8 +46,8 @@ architecture comportamento of UC is
   -- Sinais que armazem a posição de uma bola, que deverá ser desenhada
   -- na tela de acordo com sua posição.
 
-  signal pos_bola_x : integer range 0 to 127 := 64;  -- coluna atual da bola
-  signal pos_bola_y : integer range 0 to 95  := 47;  -- linha atual da bola
+  signal pos_bola_x : integer range 0 to 95 := 64;  -- coluna atual da bola
+  signal pos_bola_y : integer range 0 to 127:= 47;  -- linha atual da bola
 
   signal atualiza_pos_bola_x : std_logic;    -- se '1' = bola muda sua pos. no eixo x
   signal atualiza_pos_bola_y : std_logic;    -- se '1' = bola muda sua pos. no eixo y
@@ -86,11 +86,7 @@ architecture comportamento of UC is
   signal pontos_PAD2 : integer range 0 to 7 := 0;   -- pontos marcados pelo PAD2
   
   signal flag_inicio, flag_fim : std_logic := '0'; -- verifica se o jogo foi iniciado
-  signal flag_inicio_rstn : std_logic := '1'; -- reseta valor da flag, ativo em baixo
-  -- O QUE FALTA:
-  -- Implementar a contrucao de todas as telas (inicio, partida, reseta_partida e game_over), talvez a construcao da bola e dos PADs ja esteja 10/10
-  
-  -- ideia para deixar mais bonito: na maquina de estados, zerar tudo antes do case e so alterar para 1 dentro do case (igual ao lab10), na verdade talvez isso de problemas na verdade deve funcionar sim
+  signal flag_inicio_rstn, flag_fim_rstn : std_logic := '1'; -- reseta valor da flag, ativo em baixo
   
   type matrix_pequena is array(4 downto 0, 4 downto 0) of std_logic;
   signal display_placar1, display_placar2 : matrix_pequena;
@@ -98,6 +94,19 @@ architecture comportamento of UC is
   signal display_mensagem : matrix_grande;
   signal key_on : std_logic_vector(2 downto 0);
   signal key_code : std_logic_vector(47 downto 0);
+  
+    -- O QUE FALTA:
+  -- Conseguir fazer a maquina de estados chegar ao game_over e começar um novo jogo sem problemas
+  -- Fazer a bola quicar sempre
+  -- Existe um sinal chamado "rstn" que nao eh usado para nada
+  -- Apagar alguns comentarios e comentar algumas coisas
+  
+  -- POSSIVEIS COMPLEMENTOS
+  -- ideia para deixar mais bonito: na maquina de estados, zerar tudo antes do case e so alterar para 1 dentro do case (igual ao lab10), na verdade talvez isso de problemas na verdade deve funcionar sim
+  -- Permitir uma tecla que pause o jogo
+  -- Permitir ao usuario selecionar a cor da interface
+  
+  -- Porque p_process_bola_x e y vao com clock e nao atualiza_bola_x e y?
   
 begin  -- comportamento
 
@@ -201,6 +210,21 @@ begin  -- comportamento
 	end if;
   end process verifica_inicio;
   -----------------------------------------------------------------------------
+  
+   -----------------------------------------------------------------------------
+  -- Processo que verifica se o jogo deve acabar
+  verifica_fim: process(CLOCK_50, flag_fim_rstn)
+  begin
+   if flag_fim_rstn = '0' then
+			flag_fim <= '0';
+	elsif CLOCK_50'event and CLOCK_50 = '1' then
+		if (pontos_PAD1 >= 7) or (pontos_PAD2 >= 7) then -- se o jogo tiver acabado
+			flag_fim <= '1';
+		end if;
+	end if;
+  end process verifica_fim;
+  -----------------------------------------------------------------------------
+  
   -----------------------------------------------------------------------------
   -- Abaixo estão processos relacionados com a atualização da posição da
   -- bola e dos PAD's. Todos são controlados por sinais de enable de modo que a posição
@@ -221,6 +245,10 @@ begin  -- comportamento
       pos_bola_x <= 0;
     elsif CLOCK_50'event and CLOCK_50 = '1' then  -- rising clock edge
       if atualiza_pos_bola_x = '1' then
+		if pontos_PAD1 >=7 or pontos_PAD2 >= 7 then
+			pontos_PAD1 <= 0;
+			pontos_PAD2 <= 0;
+		end if;
         if direcao = direita then         
           if pos_bola_x = 117 then -- bola pode chegar na fronteira
 				if abs(pos_bola_y - pos_PAD2) < 4 then -- verificar se o PAD2 está na linha onde a bola pode chegar
@@ -228,11 +256,6 @@ begin  -- comportamento
 					derivada_bola <= pos_PAD2 - pos_bola_y; -- calculo da nova derivada_bola
 				else
 					pontos_PAD1 <= pontos_PAD1 + 1; -- mais um ponto para o PAD1
-					if pontos_PAD1 >= 6 then
-						flag_fim <= '1';
-					else
-						flag_fim <= '0';
-						end if;
 				   pos_bola_x <= 64;
 				   --pos_bola_y <= 80;
 				   derivada_bola <= -1;
@@ -247,11 +270,6 @@ begin  -- comportamento
 					derivada_bola <= pos_PAD1 - pos_bola_y;
 				else
 					pontos_PAD2 <= pontos_PAD2 + 1; -- mais um ponto para o PAD2
-					if pontos_PAD2 >= 6 then
-						flag_fim <= '1';
-					else
-						flag_fim <= '0';
-						end if;
 					pos_bola_x <= 64;
 		         --pos_bola_y <= 80;
 		         derivada_bola <= -1;
@@ -278,11 +296,11 @@ begin  -- comportamento
     elsif CLOCK_50'event and CLOCK_50 = '1' then  -- rising clock edge
       if atualiza_pos_bola_y = '1' then
         if direcao = desce then         
-          if pos_bola_y = 95 then
+          if pos_bola_y >= 95 then
             direcao := sobe;  
           else
 			--pos_bola_y <= pos_bola_y + 1;
-				if (pos_bola_y - derivada_bola) < 0 or (pos_bola_y + derivada_bola) > 95 then -- se sair dos limites
+				if (pos_bola_y - derivada_bola) > 95 or (pos_bola_y + derivada_bola) > 95 then -- se sair dos limites
 					pos_bola_y <= 95;
 				else
 					if derivada_bola > 0 then
@@ -293,7 +311,7 @@ begin  -- comportamento
 				end if;
           end if;        
         else  -- se a direcao é para subir
-          if pos_bola_y = 0 then
+          if pos_bola_y <= 0 then
             direcao := desce;
           else
             --pos_bola_y <= pos_bola_y - 1;
@@ -856,9 +874,282 @@ begin  -- comportamento
 		end if;
 	end process;
 	
-	process(flag_inicio)
+	process(flag_inicio, flag_fim)
 	begin
-		if flag_inicio = '0' then
+			
+		if flag_fim = '1' then
+			display_mensagem(0,0) <= '1'; --P
+			display_mensagem(1,0) <= '1';
+			display_mensagem(2,0) <= '1';
+			display_mensagem(3,0) <= '1';
+			display_mensagem(4,0) <= '1';
+			display_mensagem(0,1) <= '1';
+			display_mensagem(1,1) <= '0';
+			display_mensagem(2,1) <= '1';
+			display_mensagem(3,1) <= '0';
+			display_mensagem(4,1) <= '0';
+			display_mensagem(0,2) <= '1';
+			display_mensagem(1,2) <= '1';
+			display_mensagem(2,2) <= '1';
+			display_mensagem(3,2) <= '0';
+			display_mensagem(4,2) <= '0';
+			
+			display_mensagem(0,3) <= '0';
+			display_mensagem(1,3) <= '0';
+			display_mensagem(2,3) <= '0';
+			display_mensagem(3,3) <= '0';
+			display_mensagem(4,3) <= '0';
+			
+			display_mensagem(0,7) <= '0'; --espaco
+			display_mensagem(1,7) <= '0';
+			display_mensagem(2,7) <= '0';
+			display_mensagem(3,7) <= '0';
+			display_mensagem(4,7) <= '0';
+			display_mensagem(0,8) <= '0';
+			display_mensagem(1,8) <= '0';
+			display_mensagem(2,8) <= '0';
+			display_mensagem(3,8) <= '0';
+			display_mensagem(4,8) <= '0';
+			display_mensagem(0,9) <= '0';
+			display_mensagem(1,9) <= '0';
+			display_mensagem(2,9) <= '0';
+			display_mensagem(3,9) <= '0';
+			display_mensagem(4,9) <= '0';
+			display_mensagem(0,10) <= '0';
+			display_mensagem(1,10) <= '0';
+			display_mensagem(2,10) <= '0';
+			display_mensagem(3,10) <= '0';
+			display_mensagem(4,10) <= '0';
+			display_mensagem(0,11) <= '0';
+			display_mensagem(1,11) <= '0';
+			display_mensagem(2,11) <= '0';
+			display_mensagem(3,11) <= '0';
+			display_mensagem(4,11) <= '0';
+			
+			display_mensagem(0,12) <= '1'; --G
+			display_mensagem(1,12) <= '1';
+			display_mensagem(2,12) <= '1';
+			display_mensagem(3,12) <= '1';
+			display_mensagem(4,12) <= '1';
+			display_mensagem(0,13) <= '1';
+			display_mensagem(1,13) <= '0';
+			display_mensagem(2,13) <= '1';
+			display_mensagem(3,13) <= '0';
+			display_mensagem(4,13) <= '1';
+			display_mensagem(0,14) <= '0';
+			display_mensagem(1,14) <= '0';
+			display_mensagem(2,14) <= '1';
+			display_mensagem(3,14) <= '1';
+			display_mensagem(4,14) <= '1';
+			
+			display_mensagem(0,15) <= '0';
+			display_mensagem(1,15) <= '0';
+			display_mensagem(2,15) <= '0';
+			display_mensagem(3,15) <= '0';
+			display_mensagem(4,15) <= '0';
+			
+			display_mensagem(0,16) <= '1'; --A
+			display_mensagem(1,16) <= '1';
+			display_mensagem(2,16) <= '1';
+			display_mensagem(3,16) <= '1';
+			display_mensagem(4,16) <= '1';
+			display_mensagem(0,17) <= '1';
+			display_mensagem(1,17) <= '0';
+			display_mensagem(2,17) <= '1';
+			display_mensagem(3,17) <= '0';
+			display_mensagem(4,17) <= '0';
+			display_mensagem(0,18) <= '1';
+			display_mensagem(1,18) <= '1';
+			display_mensagem(2,18) <= '1';
+			display_mensagem(3,18) <= '1';
+			display_mensagem(4,18) <= '1';
+			
+			display_mensagem(0,19) <= '0';
+			display_mensagem(1,19) <= '0';
+			display_mensagem(2,19) <= '0';
+			display_mensagem(3,19) <= '0';
+			display_mensagem(4,19) <= '0';
+			
+			display_mensagem(0,20) <= '1'; --N
+			display_mensagem(1,20) <= '1';
+			display_mensagem(2,20) <= '1';
+			display_mensagem(3,20) <= '1';
+			display_mensagem(4,20) <= '1';
+			display_mensagem(0,21) <= '1';
+			display_mensagem(1,21) <= '0';
+			display_mensagem(2,21) <= '0';
+			display_mensagem(3,21) <= '0';
+			display_mensagem(4,21) <= '0';
+			display_mensagem(0,22) <= '1';
+			display_mensagem(1,22) <= '1';
+			display_mensagem(2,22) <= '1';
+			display_mensagem(3,22) <= '1';
+			display_mensagem(4,22) <= '1';
+			
+			display_mensagem(0,23) <= '0';
+			display_mensagem(1,23) <= '0';
+			display_mensagem(2,23) <= '0';
+			display_mensagem(3,23) <= '0';
+			display_mensagem(4,23) <= '0';
+			
+			display_mensagem(0,24) <= '1'; --H
+			display_mensagem(1,24) <= '1';
+			display_mensagem(2,24) <= '1';
+			display_mensagem(3,24) <= '1';
+			display_mensagem(4,24) <= '1';
+			display_mensagem(0,25) <= '0';
+			display_mensagem(1,25) <= '0';
+			display_mensagem(2,25) <= '1';
+			display_mensagem(3,25) <= '0';
+			display_mensagem(4,25) <= '0';
+			display_mensagem(0,26) <= '1';
+			display_mensagem(1,26) <= '1';
+			display_mensagem(2,26) <= '1';
+			display_mensagem(3,26) <= '1';
+			display_mensagem(4,26) <= '1';
+			
+			display_mensagem(0,27) <= '0';
+			display_mensagem(1,27) <= '0';
+			display_mensagem(2,27) <= '0';
+			display_mensagem(3,27) <= '0';
+			display_mensagem(4,27) <= '0';
+			
+			display_mensagem(0,28) <= '1'; --O
+			display_mensagem(1,28) <= '1';
+			display_mensagem(2,28) <= '1';
+			display_mensagem(3,28) <= '1';
+			display_mensagem(4,28) <= '1';
+			display_mensagem(0,29) <= '1';
+			display_mensagem(1,29) <= '0';
+			display_mensagem(2,29) <= '0';
+			display_mensagem(3,29) <= '0';
+			display_mensagem(4,29) <= '1';
+			display_mensagem(0,30) <= '1';
+			display_mensagem(1,30) <= '1';
+			display_mensagem(2,30) <= '1';
+			display_mensagem(3,30) <= '1';
+			display_mensagem(4,30) <= '1';
+			
+			display_mensagem(0,31) <= '0';
+			display_mensagem(1,31) <= '0';
+			display_mensagem(2,31) <= '0';
+			display_mensagem(3,31) <= '0';
+			display_mensagem(4,31) <= '0';
+			
+			display_mensagem(0,32) <= '1'; --U
+			display_mensagem(1,32) <= '1';
+			display_mensagem(2,32) <= '1';
+			display_mensagem(3,32) <= '1';
+			display_mensagem(4,32) <= '1';
+			display_mensagem(0,33) <= '0';
+			display_mensagem(1,33) <= '0';
+			display_mensagem(2,33) <= '0';
+			display_mensagem(3,33) <= '0';
+			display_mensagem(4,33) <= '1';
+			display_mensagem(0,34) <= '1';
+			display_mensagem(1,34) <= '1';
+			display_mensagem(2,34) <= '1';
+			display_mensagem(3,34) <= '1';
+			display_mensagem(4,34) <= '1';
+			
+			display_mensagem(0,35) <= '0';
+			display_mensagem(1,35) <= '0';
+			display_mensagem(2,35) <= '0';
+			display_mensagem(3,35) <= '0';
+			display_mensagem(4,35) <= '0';
+			
+			display_mensagem(0,36) <= '1'; --!
+			display_mensagem(1,36) <= '1';
+			display_mensagem(2,36) <= '1';
+			display_mensagem(3,36) <= '0';
+			display_mensagem(4,36) <= '1';
+			display_mensagem(0,37) <= '0';
+			display_mensagem(1,37) <= '0';
+			display_mensagem(2,37) <= '0';
+			display_mensagem(3,37) <= '0';
+			display_mensagem(4,37) <= '0';
+			display_mensagem(0,38) <= '0';
+			display_mensagem(1,38) <= '0';
+			display_mensagem(2,38) <= '0';
+			display_mensagem(3,38) <= '0';
+			display_mensagem(4,38) <= '0';
+			
+			display_mensagem(0,39) <= '0';
+			display_mensagem(1,39) <= '0';
+			display_mensagem(2,39) <= '0';
+			display_mensagem(3,39) <= '1';
+			display_mensagem(4,39) <= '1';
+			display_mensagem(0,40) <= '1';
+			display_mensagem(1,40) <= '1';
+			display_mensagem(2,40) <= '0';
+			display_mensagem(3,40) <= '0';
+			display_mensagem(4,40) <= '1';
+			display_mensagem(0,41) <= '1';
+			display_mensagem(1,41) <= '1';
+			display_mensagem(2,41) <= '0';
+			display_mensagem(3,41) <= '0';
+			display_mensagem(4,41) <= '1';
+			display_mensagem(0,42) <= '0';
+			display_mensagem(1,42) <= '0';
+			display_mensagem(2,42) <= '0';
+			display_mensagem(3,42) <= '0';
+			display_mensagem(4,42) <= '1';
+			display_mensagem(0,43) <= '1';
+			display_mensagem(1,43) <= '1';
+			display_mensagem(2,43) <= '0';
+			display_mensagem(3,43) <= '0';
+			display_mensagem(4,43) <= '1';
+			display_mensagem(0,44) <= '1';
+			display_mensagem(1,44) <= '1';
+			display_mensagem(2,44) <= '0';
+			display_mensagem(3,44) <= '0';
+			display_mensagem(4,44) <= '1';
+			display_mensagem(0,45) <= '0';
+			display_mensagem(1,45) <= '0';
+			display_mensagem(2,45) <= '0';
+			display_mensagem(3,45) <= '1';
+			display_mensagem(4,45) <= '1';
+			display_mensagem(0,46) <= '0';
+			display_mensagem(1,46) <= '0';
+			display_mensagem(2,46) <= '0';
+			display_mensagem(3,46) <= '0';
+			display_mensagem(4,46) <= '0';
+				
+			if pontos_PAD1 >= 6 then		
+				display_mensagem(0,4) <= '0'; --1
+				display_mensagem(1,4) <= '1';
+				display_mensagem(2,4) <= '0';
+				display_mensagem(3,4) <= '0';
+				display_mensagem(4,4) <= '1';
+				display_mensagem(0,5) <= '1';
+				display_mensagem(1,5) <= '1';
+				display_mensagem(2,5) <= '1';
+				display_mensagem(3,5) <= '1';
+				display_mensagem(4,5) <= '1';
+				display_mensagem(0,6) <= '0';
+				display_mensagem(1,6) <= '0';
+				display_mensagem(2,6) <= '0';
+				display_mensagem(3,6) <= '0';
+				display_mensagem(4,6) <= '1';
+			else
+				display_mensagem(0,4) <= '1'; --2
+				display_mensagem(1,4) <= '0';
+				display_mensagem(2,4) <= '1';
+				display_mensagem(3,4) <= '1';
+				display_mensagem(4,4) <= '1';
+				display_mensagem(0,5) <= '1';
+				display_mensagem(1,5) <= '0';
+				display_mensagem(2,5) <= '1';
+				display_mensagem(3,5) <= '0';
+				display_mensagem(4,5) <= '1';
+				display_mensagem(0,6) <= '1';
+				display_mensagem(1,6) <= '1';
+				display_mensagem(2,6) <= '1';
+				display_mensagem(3,6) <= '0';
+				display_mensagem(4,6) <= '1';
+			end if;
+		
+		elsif flag_inicio = '0' then
 			display_mensagem(0,0) <= '1'; --A
 			display_mensagem(1,0) <= '1';
 			display_mensagem(2,0) <= '1';
@@ -1115,233 +1406,6 @@ begin  -- comportamento
 			display_mensagem(3,46) <= '0';
 			display_mensagem(4,46) <= '1';
 			
-			
-		else
-			display_mensagem(0,0) <= '0';
-		end if;
-	end process;
-	
-	process(flag_fim)
-	begin
-		if flag_fim = '1' then
-		if pontos_PAD1 >= 6 then
-			display_mensagem(0,0) <= '1'; --P
-			display_mensagem(1,0) <= '1';
-			display_mensagem(2,0) <= '1';
-			display_mensagem(3,0) <= '1';
-			display_mensagem(4,0) <= '1';
-			display_mensagem(0,1) <= '1';
-			display_mensagem(1,1) <= '0';
-			display_mensagem(2,1) <= '1';
-			display_mensagem(3,1) <= '0';
-			display_mensagem(4,1) <= '0';
-			display_mensagem(0,2) <= '1';
-			display_mensagem(1,2) <= '1';
-			display_mensagem(2,2) <= '1';
-			display_mensagem(3,2) <= '0';
-			display_mensagem(4,2) <= '0';
-			
-			display_mensagem(0,3) <= '0';
-			display_mensagem(1,3) <= '0';
-			display_mensagem(2,3) <= '0';
-			display_mensagem(3,3) <= '0';
-			display_mensagem(4,3) <= '0';
-			
-			display_mensagem(0,4) <= '0'; --1
-			display_mensagem(1,4) <= '1';
-			display_mensagem(2,4) <= '0';
-			display_mensagem(3,4) <= '0';
-			display_mensagem(4,4) <= '1';
-			display_mensagem(0,5) <= '1';
-			display_mensagem(1,5) <= '1';
-			display_mensagem(2,5) <= '1';
-			display_mensagem(3,5) <= '1';
-			display_mensagem(4,5) <= '1';
-			display_mensagem(0,6) <= '0';
-			display_mensagem(1,6) <= '0';
-			display_mensagem(2,6) <= '0';
-			display_mensagem(3,6) <= '0';
-			display_mensagem(4,6) <= '1';
-			
-			display_mensagem(0,7) <= '0'; --espaco
-			display_mensagem(1,7) <= '0';
-			display_mensagem(2,7) <= '0';
-			display_mensagem(3,7) <= '0';
-			display_mensagem(4,7) <= '0';
-			display_mensagem(0,8) <= '0';
-			display_mensagem(1,8) <= '0';
-			display_mensagem(2,8) <= '0';
-			display_mensagem(3,8) <= '0';
-			display_mensagem(4,8) <= '0';
-			display_mensagem(0,9) <= '0';
-			display_mensagem(1,9) <= '0';
-			display_mensagem(2,9) <= '0';
-			display_mensagem(3,9) <= '0';
-			display_mensagem(4,9) <= '0';
-			display_mensagem(0,10) <= '0';
-			display_mensagem(1,10) <= '0';
-			display_mensagem(2,10) <= '0';
-			display_mensagem(3,10) <= '0';
-			display_mensagem(4,10) <= '0';
-			display_mensagem(0,11) <= '0';
-			display_mensagem(1,11) <= '0';
-			display_mensagem(2,11) <= '0';
-			display_mensagem(3,11) <= '0';
-			display_mensagem(4,11) <= '0';
-			
-			display_mensagem(0,12) <= '1'; --G
-			display_mensagem(1,12) <= '1';
-			display_mensagem(2,12) <= '1';
-			display_mensagem(3,12) <= '1';
-			display_mensagem(4,12) <= '1';
-			display_mensagem(0,13) <= '1';
-			display_mensagem(1,13) <= '0';
-			display_mensagem(2,13) <= '1';
-			display_mensagem(3,13) <= '0';
-			display_mensagem(4,13) <= '1';
-			display_mensagem(0,14) <= '0';
-			display_mensagem(1,14) <= '0';
-			display_mensagem(2,14) <= '1';
-			display_mensagem(3,14) <= '1';
-			display_mensagem(4,14) <= '1';
-			
-			display_mensagem(0,15) <= '0';
-			display_mensagem(1,15) <= '0';
-			display_mensagem(2,15) <= '0';
-			display_mensagem(3,15) <= '0';
-			display_mensagem(4,15) <= '0';
-			
-			display_mensagem(0,16) <= '1'; --A
-			display_mensagem(1,16) <= '1';
-			display_mensagem(2,16) <= '1';
-			display_mensagem(3,16) <= '1';
-			display_mensagem(4,16) <= '1';
-			display_mensagem(0,17) <= '1';
-			display_mensagem(1,17) <= '0';
-			display_mensagem(2,17) <= '1';
-			display_mensagem(3,17) <= '0';
-			display_mensagem(4,17) <= '0';
-			display_mensagem(0,18) <= '1';
-			display_mensagem(1,18) <= '1';
-			display_mensagem(2,18) <= '1';
-			display_mensagem(3,18) <= '1';
-			display_mensagem(4,18) <= '1';
-			
-			display_mensagem(0,19) <= '0';
-			display_mensagem(1,19) <= '0';
-			display_mensagem(2,19) <= '0';
-			display_mensagem(3,19) <= '0';
-			display_mensagem(4,19) <= '0';
-			
-			display_mensagem(0,20) <= '1'; --N
-			display_mensagem(1,20) <= '0';
-			display_mensagem(2,20) <= '0';
-			display_mensagem(3,20) <= '0';
-			display_mensagem(4,20) <= '0';
-			display_mensagem(0,21) <= '1';
-			display_mensagem(1,21) <= '1';
-			display_mensagem(2,21) <= '1';
-			display_mensagem(3,21) <= '1';
-			display_mensagem(4,21) <= '1';
-			display_mensagem(0,22) <= '1';
-			display_mensagem(1,22) <= '0';
-			display_mensagem(2,22) <= '0';
-			display_mensagem(3,22) <= '0';
-			display_mensagem(4,22) <= '0';
-			
-			display_mensagem(0,23) <= '0';
-			display_mensagem(1,23) <= '0';
-			display_mensagem(2,23) <= '0';
-			display_mensagem(3,23) <= '0';
-			display_mensagem(4,23) <= '0';
-			
-			display_mensagem(0,24) <= '1'; --H
-			display_mensagem(1,24) <= '1';
-			display_mensagem(2,24) <= '1';
-			display_mensagem(3,24) <= '1';
-			display_mensagem(4,24) <= '1';
-			display_mensagem(0,25) <= '1';
-			display_mensagem(1,25) <= '0';
-			display_mensagem(2,25) <= '1';
-			display_mensagem(3,25) <= '0';
-			display_mensagem(4,25) <= '1';
-			display_mensagem(0,26) <= '1';
-			display_mensagem(1,26) <= '0';
-			display_mensagem(2,26) <= '0';
-			display_mensagem(3,26) <= '0';
-			display_mensagem(4,26) <= '1';
-			
-			display_mensagem(0,27) <= '0';
-			display_mensagem(1,27) <= '0';
-			display_mensagem(2,27) <= '0';
-			display_mensagem(3,27) <= '0';
-			display_mensagem(4,27) <= '0';
-			
-			display_mensagem(0,28) <= '1'; --O
-			display_mensagem(1,28) <= '1';
-			display_mensagem(2,28) <= '1';
-			display_mensagem(3,28) <= '1';
-			display_mensagem(4,28) <= '1';
-			display_mensagem(0,29) <= '1';
-			display_mensagem(1,29) <= '0';
-			display_mensagem(2,29) <= '1';
-			display_mensagem(3,29) <= '0';
-			display_mensagem(4,29) <= '1';
-			display_mensagem(0,30) <= '1';
-			display_mensagem(1,30) <= '0';
-			display_mensagem(2,30) <= '0';
-			display_mensagem(3,30) <= '0';
-			display_mensagem(4,30) <= '1';
-			
-			display_mensagem(0,31) <= '0';
-			display_mensagem(1,31) <= '0';
-			display_mensagem(2,31) <= '0';
-			display_mensagem(3,31) <= '0';
-			display_mensagem(4,31) <= '0';
-			
-			display_mensagem(0,32) <= '1'; --U
-			display_mensagem(1,32) <= '1';
-			display_mensagem(2,32) <= '1';
-			display_mensagem(3,32) <= '1';
-			display_mensagem(4,32) <= '1';
-			display_mensagem(0,33) <= '1';
-			display_mensagem(1,33) <= '0';
-			display_mensagem(2,33) <= '0';
-			display_mensagem(3,33) <= '0';
-			display_mensagem(4,33) <= '0';
-			display_mensagem(0,34) <= '1';
-			display_mensagem(1,34) <= '1';
-			display_mensagem(2,34) <= '1';
-			display_mensagem(3,34) <= '1';
-			display_mensagem(4,34) <= '1';
-			
-			display_mensagem(0,35) <= '0';
-			display_mensagem(1,35) <= '0';
-			display_mensagem(2,35) <= '0';
-			display_mensagem(3,35) <= '0';
-			display_mensagem(4,35) <= '0';
-			
-			display_mensagem(0,36) <= '1'; --!
-			display_mensagem(1,36) <= '0';
-			display_mensagem(2,36) <= '0';
-			display_mensagem(3,36) <= '0';
-			display_mensagem(4,36) <= '0';
-			display_mensagem(0,37) <= '1';
-			display_mensagem(1,37) <= '1';
-			display_mensagem(2,37) <= '1';
-			display_mensagem(3,37) <= '1';
-			display_mensagem(4,37) <= '1';
-			display_mensagem(0,38) <= '1';
-			display_mensagem(1,38) <= '0';
-			display_mensagem(2,38) <= '0';
-			display_mensagem(3,38) <= '0';
-			display_mensagem(4,38) <= '0';
-			
-			else
-			
-			
-			
-			end if;
 		else
 			display_mensagem(0,0) <= '0';
 		end if;
@@ -1350,29 +1414,25 @@ begin  -- comportamento
 	process(CLOCK_50)
 	begin
 		if CLOCK_50'event and CLOCK_50 = '1' then
-			case estado is
-				when inicio_jogo    => 
-
-				when constroi_quadro => if ((col = pos_bola_x) and (line = pos_bola_y)) 
-													or ((abs(line-pos_PAD1) < 4) and col = 10)
-													or ((abs(line-pos_PAD2) < 4) and col = 117) then
-													pixel_bit <= '1';
-												elsif ((abs(line-5) < 3) and ((abs(col-55) < 3))) then
-													pixel_bit <= display_placar1(line-3, col-53);
-												elsif ((abs(line-5) < 3) and ((abs(col-71) < 3))) then
-													pixel_bit <= display_placar2(line-3, col-69);	
-												elsif ((abs(line-25) < 3) and ((abs(col-63) < 24)) and ((flag_inicio = '0') or (flag_fim = '1')))then
-													pixel_bit <= display_mensagem(line-23, col-40);
-												else
-													pixel_bit <= '0';	
-												end if;
-												
-
-				when game_over      => pixel_bit <= '1';
-
-				when others         => pixel_bit <= pixel_bit;
-
-			end case;
+			if estado = constroi_quadro then
+				-- Impressao das bolas e PADs
+				if ((col = pos_bola_x) and (line = pos_bola_y)) 
+											  or ((abs(line-pos_PAD1) < 4) and col = 10)
+											  or ((abs(line-pos_PAD2) < 4) and col = 117) then
+					pixel_bit <= '1';
+				-- Placar do jogador 1
+				elsif ((abs(line-5) < 3) and ((abs(col-55) < 3))) then
+					pixel_bit <= display_placar1(line-3, col-53);
+				-- Placar do jogador 2
+				elsif ((abs(line-5) < 3) and ((abs(col-71) < 3))) then
+					pixel_bit <= display_placar2(line-3, col-69);
+				-- Mensagem do começo e fim do jogo
+				elsif ((abs(line-25) < 3) and ((abs(col-63) < 24)) and ((flag_inicio = '0') or (flag_fim = '1')))then
+					pixel_bit <= display_mensagem(line-23, col-40);
+				else
+					pixel_bit <= '0';	
+				end if;
+			end if;
 		end if;
 	end process;
 	  
@@ -1396,12 +1456,10 @@ begin  -- comportamento
   logica_mealy: process (estado, fim_escrita, timer, flag_inicio)
   begin  -- process logica_mealy
     case estado is
-		when inicio_jogo    => if timer = '1' then
-									    if flag_inicio = '1' then
+		when inicio_jogo    => if flag_inicio = '1' then
 										   proximo_estado <= inicio_partida;
-										 else
+									  elsif timer = '1' then
                                  proximo_estado <= constroi_quadro;
-										 end if;
                              else
                                proximo_estado <= inicio_jogo;
                              end if;
@@ -1409,6 +1467,7 @@ begin  -- comportamento
                              atualiza_pos_bola_y <= '0';
 									  atualiza_pos_PADs   <= '0';
 									  flag_inicio_rstn <= '1';
+									  flag_fim_rstn <= '0';
                              line_rstn      <= '0';  -- reset é active low!
                              line_enable    <= '0';
                              col_rstn       <= '0';  -- reset é active low!
@@ -1426,6 +1485,7 @@ begin  -- comportamento
                              atualiza_pos_bola_y <= '0';
 									  atualiza_pos_PADs   <= '0';
 									  flag_inicio_rstn <= '1';
+									  flag_fim_rstn <= '1';
                              line_rstn      <= '0';  -- reset é active low!
                              line_enable    <= '0';
                              col_rstn       <= '0';  -- reset é active low!
@@ -1435,13 +1495,19 @@ begin  -- comportamento
                              timer_enable   <= '1';
 
       when constroi_quadro=> if fim_escrita = '1' then
-										if flag_inicio = '1' then
-											proximo_estado <= move_bola_e_PADs;
-											flag_inicio_rstn <= '1';
-										elsif flag_fim = '1' then
+										if flag_fim = '1' then
 											proximo_estado <= game_over;
 											flag_inicio_rstn <= '0';
-										else
+										elsif flag_inicio = '1' then
+											proximo_estado <= move_bola_e_PADs;
+											flag_inicio_rstn <= '1';
+--										if flag_inicio = '1' then
+--											proximo_estado <= move_bola_e_PADs;
+--											flag_inicio_rstn <= '1';
+--										elsif flag_fim = '1' then
+--											proximo_estado <= game_over;
+--											flag_inicio_rstn <= '0';
+										else -- por que existe esse else mesmo?
 											proximo_estado <= inicio_jogo;
 											flag_inicio_rstn <= '1';
 										end if;
@@ -1450,7 +1516,8 @@ begin  -- comportamento
                              end if;
                              atualiza_pos_bola_x <= '0';
                              atualiza_pos_bola_y <= '0';
-									  atualiza_pos_PADs   <= '0';		  
+									  atualiza_pos_PADs   <= '0';		
+									  flag_fim_rstn <= '1';  
                              line_rstn      <= '1';
                              line_enable    <= '1';
                              col_rstn       <= '1';
@@ -1471,27 +1538,29 @@ begin  -- comportamento
 									  atualiza_pos_PADs   <= '1';
                              line_rstn      <= '1';
                              line_enable    <= '0';
+									  flag_fim_rstn <= '1';
                              col_rstn       <= '1';
                              col_enable     <= '0';
                              we             <= '0';
                              timer_rstn     <= '0'; 
                              timer_enable   <= '0';
 		
-		when game_over=>       if flag_fim = '0' then
+		when game_over=>       if flag_inicio = '1' then -- mudado de if flag_fim = '0'
 										proximo_estado <= inicio_jogo;
 									  else
 										proximo_estado <= constroi_quadro;
 									  end if;
-                             atualiza_pos_bola_x <= '1';
-                             atualiza_pos_bola_y <= '1';
-									  atualiza_pos_PADs   <= '1';
-									  flag_inicio_rstn <= '0';
-                             line_rstn      <= '1';
+                             atualiza_pos_bola_x <= '0';
+                             atualiza_pos_bola_y <= '0';
+									  atualiza_pos_PADs   <= '0';
+									  flag_inicio_rstn <= '1';
+									  flag_fim_rstn <= '1';
+                             line_rstn      <= '0';
                              line_enable    <= '0';
-                             col_rstn       <= '1';
+                             col_rstn       <= '0';
                              col_enable     <= '0';
                              we             <= '0';
-                             timer_rstn     <= '0'; 
+                             timer_rstn     <= '0';
                              timer_enable   <= '0';
 									  
       when others         => proximo_estado <= inicio_partida;
@@ -1499,6 +1568,7 @@ begin  -- comportamento
                              atualiza_pos_bola_y <= '0';
 									  atualiza_pos_PADs   <= '0';
 									  flag_inicio_rstn <= '1';
+									  flag_fim_rstn <= '1';
                              line_rstn      <= '1';
                              line_enable    <= '0';
                              col_rstn       <= '1';
@@ -1517,7 +1587,7 @@ begin  -- comportamento
   seq_fsm: process (CLOCK_50, rstn)
   begin  -- process seq_fsm
     if rstn = '0' then                  -- asynchronous reset (active low)
-      estado <= inicio_partida;
+      estado <= inicio_jogo;
     elsif CLOCK_50'event and CLOCK_50 = '1' then  -- rising clock edge
       estado <= proximo_estado;
     end if;
