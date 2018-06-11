@@ -4,54 +4,30 @@ use ieee.std_logic_1164.all;
 entity UC is
   port (    
     CLOCK_50                  : in  std_logic;
-	 PS2_DAT : inout STD_LOGIC;
-    PS2_CLK : inout STD_LOGIC;
-    VGA_R, VGA_G, VGA_B       : out std_logic_vector(7 downto 0);
-    VGA_HS, VGA_VS            : out std_logic;
-    VGA_BLANK_N, VGA_SYNC_N   : out std_logic;
-    VGA_CLK                   : out std_logic
+	 pontos_PAD1, pontos_PAD2: in integer range 0 to 7;
+	 pos_bola_x: in integer range 0 to 127;
+	 pos_bola_y: in integer range 0 to 95;
+	 pos_PAD1, pos_PAD2: in integer range 3 to 92;
+	 key_on  : in std_logic_vector(2 downto 0);
+    key_code: in std_logic_vector(47 downto 0);
+	 atualiza_pos_bola_x, atualiza_pos_bola_y, atualiza_pos_PADs: out std_logic;
+	 flag_inicio, we: out std_logic;
+	 addr : out integer range 0 to 12287;
+	 pixel : out std_logic_vector(2 downto 0)  -- valor de cor do pixel_aux
     );
 end UC;
 
 architecture comportamento of UC is
-
-	component estado_partida is
-	  port (
-		atualiza_pos_bola_x, atualiza_pos_bola_y: in std_logic;
-		flag_inicio: in std_logic;
-		pos_PAD1 : in integer range 3 to 92;   
-      pos_PAD2 : in integer range 3 to 92;   
-		pontos_PAD1, pontos_PAD2: out integer range 0 to 7;
-		pos_bola_x: out integer range 0 to 127;
-		pos_bola_y: out integer range 0 to 95
-		 );
-	end component;
-	
-	component padcon is
-	  port (
-		CLOCK_50: in  std_logic;
-		atualiza_pos_PADs: in std_logic;
-		PS2_DAT : inout STD_LOGIC;
-		PS2_CLK : inout STD_LOGIC;
-		pos_PAD1, pos_PAD2: out integer range 3 to 92
-		 );
-	end component;
-
-  signal pos_bola_x : integer range 0 to 127:= 64;  -- coluna atual da bola
-  signal pos_bola_y : integer range 0 to 95 := 47;  -- linha atual da bola
-  
-  signal pontos_PAD1 : integer range 0 to 7:= 0;   -- pontos marcados pelo PAD1
-  signal pontos_PAD2 : integer range 0 to 7:= 0;   -- pontos marcados pelo PAD2	
 	
   -- Interface com a memória de vídeo do controlador
 
-  signal we : std_logic;                        -- write enable ('1' p/ escrita)
-  signal addr : integer range 0 to 12287;       -- endereco mem. vga
-  signal pixel : std_logic_vector(2 downto 0);  -- valor de cor do pixel
-  signal pixel_bit : std_logic;                 -- um bit do vetor acima
+  signal we_aux : std_logic;                        -- write enable ('1' p/ escrita)
+  signal addr_aux : integer range 0 to 12287;       -- endereco mem. vga
+  signal pixel_aux : std_logic_vector(2 downto 0);  -- valor de cor do pixel_aux
+  signal pixel_aux_bit : std_logic;                 -- um bit do vetor acima
 
   -- Sinais dos contadores de linhas e colunas utilizados para percorrer
-  -- as posições da memória de vídeo (pixels) no momento de construir um quadro.
+  -- as posições da memória de vídeo (pixel_auxs) no momento de construir um quadro.
   
   signal line : integer range 0 to 95;  -- linha atual
   signal col : integer range 0 to 127;  -- coluna atual
@@ -68,8 +44,8 @@ architecture comportamento of UC is
   -- Sinais que armazem a posição de uma bola, que deverá ser desenhada
   -- na tela de acordo com sua posição.
 
-  signal atualiza_pos_bola_x : std_logic;    -- se '1' = bola muda sua pos. no eixo x
-  signal atualiza_pos_bola_y : std_logic;    -- se '1' = bola muda sua pos. no eixo y
+  signal atualiza_pos_bola_x_aux : std_logic;    -- se '1' = bola muda sua pos. no eixo x
+  signal atualiza_pos_bola_y_aux : std_logic;    -- se '1' = bola muda sua pos. no eixo y
   
   -- Especificação dos tipos e sinais da máquina de estados de controle
   type estado_t is (inicio_jogo, inicio_partida, constroi_quadro, move_bola_e_PADs, game_over);
@@ -84,90 +60,22 @@ architecture comportamento of UC is
   signal contador : integer range 0 to 1250000 - 1 := 0;  -- contador
   signal timer : std_logic;        -- vale '1' quando o contador chegar ao fim
   signal timer_rstn, timer_enable : std_logic;
-  
-  signal sync, blank: std_logic;
 
-  -- Sinais para controlar o movimento dos PAD's
-  -- PAD tem o seu tamanho definido como 7 pixels
-  signal pos_PAD1 : integer range 3 to 92 := 47;   -- linha atual do pixel central do PAD1
-  signal pos_PAD2 : integer range 3 to 92 := 47;   -- linha atual do pixel central do PAD2
-
-  signal atualiza_pos_PADs : std_logic;    -- se '1' = PAD1 e PAD2 muda sua pos. no eixo y
+  signal atualiza_pos_PADs_aux : std_logic;    -- se '1' = PAD1 e PAD2 muda sua pos. no eixo y
   
-  signal flag_inicio, flag_fim : std_logic := '0'; -- verifica se o jogo foi iniciado
-  signal flag_inicio_rstn: std_logic := '1'; -- reseta valor da flag, ativo em baixo
+  signal flag_inicio_aux, flag_fim : std_logic := '0'; -- verifica se o jogo foi iniciado
+  signal flag_inicio_aux_rstn: std_logic := '1'; -- reseta valor da flag, ativo em baixo
   
   type matrix_pequena is array(4 downto 0, 4 downto 0) of std_logic;
   signal display_placar1, display_placar2 : matrix_pequena;
   type matrix_grande is array(4 downto 0, 46 downto 0) of std_logic;
   signal display_mensagem : matrix_grande;
-  signal key_on : std_logic_vector(2 downto 0);
-  signal key_code : std_logic_vector(47 downto 0);
   
   -- POSSIVEIS COMPLEMENTOS
   -- Permitir uma tecla que pause o jogo
   -- Permitir ao usuario selecionar a cor da interface
   
 begin  -- comportamento
-
-
-	-- Aqui instanciamos o controlador de vídeo, 128 colunas por 96 linhas
-	-- (aspect ratio 4:3). Os sinais que iremos utilizar para comunicar
-	-- com a memória de vídeo (para alterar o brilho dos pixels) são
-	-- write_clk (nosso clock), write_enable ('1' quando queremos escrever
-	-- o valor de um pixel), write_addr (endereço do pixel a escrever)
-	-- e data_in (valor do brilho do pixel RGB, 1 bit pra cada componente de cor)
-	vga_controller: entity work.vgacon port map (
-		clk50M       => CLOCK_50,
-		rstn         => '1',
-		red          => VGA_R,
-		green        => VGA_G,
-		blue         => VGA_B,
-		hsync        => VGA_HS,
-		vsync        => VGA_VS,
-		write_clk    => CLOCK_50,
-		write_enable => we,
-		write_addr   => addr,
-		data_in      => pixel,
-		vga_clk      => VGA_CLK,
-		sync         => sync,
-		blank        => blank);
-	VGA_SYNC_N <= NOT sync;
-	VGA_BLANK_N <= NOT blank;
-
-	-- controlador do teclado
-	kbdex_controller: entity work.kbdex_ctrl generic map(clkfreq=>50000) port map (
-		ps2_data	=> PS2_DAT,
-		ps2_clk	=> PS2_CLK,
-		clk		=> CLOCK_50,
-		en			=> '1',
-		resetn	=> '1',
-		lights	=> "000",
-		key_on	=> key_on,
-		key_code	=> key_code);
-	
-	-- controlador da bola e dos pontos
-	estado_partida_inst: estado_partida port map (
-		atualiza_pos_bola_x => atualiza_pos_bola_x,
-		atualiza_pos_bola_y => atualiza_pos_bola_y,
-		flag_inicio => flag_inicio,
-		pos_PAD1 => pos_PAD1,   
-		pos_PAD2 => pos_PAD2,   
-		pontos_PAD1 => pontos_PAD1,
-		pontos_PAD2 => pontos_PAD2,
-		pos_bola_x => pos_bola_x,
-		pos_bola_y  => pos_bola_y
-	);
-	
-	-- controlador dos PAD's
-	padcon_inst: padcon port map (
-		CLOCK_50 => CLOCK_50,
-		atualiza_pos_PADs => atualiza_pos_PADs,
-		PS2_DAT => PS2_DAT,
-		PS2_CLK => PS2_CLK,
-		pos_PAD1 => pos_PAD1,
-		pos_PAD2 => pos_PAD2
-	);
 	
   -----------------------------------------------------------------------------
   -- Processos que controlam contadores de linhas e coluna para varrer
@@ -224,16 +132,16 @@ begin  -- comportamento
 				 
   -----------------------------------------------------------------------------
   -- Processo que verifica se o jogo deve ser iniciado ou finalizado
-  verifica_inicio_fim: process(CLOCK_50, flag_inicio_rstn)
+  verifica_inicio_fim: process(CLOCK_50, flag_inicio_aux_rstn)
   begin
-   if flag_inicio_rstn = '0' then
-			flag_inicio <= '0';
+   if flag_inicio_aux_rstn = '0' then
+			flag_inicio_aux <= '0';
 	elsif CLOCK_50'event and CLOCK_50 = '1' then
 		if (pontos_PAD1 >= 7) or (pontos_PAD2 >= 7) then -- se o jogo tiver acabado
 			flag_fim <= '1';
 		end if;
 		if key_code(15 downto 0) = x"005A" or key_code(15 downto 0) = x"E05A" then -- se a tecla "ENTER" for pressionada
-			flag_inicio <= '1';
+			flag_inicio_aux <= '1';
 			flag_fim <= '0';
 		end if;
 	end if;
@@ -242,7 +150,7 @@ begin  -- comportamento
    -----------------------------------------------------------------------------
   -- Mensagens
   -----------------------------------------------------------------------------
-  -- Marca pixels que serao usados para imprimir o placar e as mensagens inicial
+  -- Marca pixel_auxs que serao usados para imprimir o placar e as mensagens inicial
   -- e final.
 
 	-- Para o display do placar, uma matriz 5x5 eh o suficiente para mostrar os 8 primeiros algarismos na tela
@@ -747,7 +655,7 @@ begin  -- comportamento
 	end process;
 	
 	-- Mensagens do comeco e fim da partida
-	process(flag_inicio, flag_fim)
+	process(flag_inicio_aux, flag_fim)
 	begin
 		-- mensagem final de cada partida
 		if pontos_PAD1 >=7 or pontos_PAD2 >= 7  then
@@ -1023,7 +931,7 @@ begin  -- comportamento
 				display_mensagem(4,6) <= '1';
 			end if;
 		
-		elsif flag_inicio = '0' then -- mensagem inicial
+		elsif flag_inicio_aux = '0' then -- mensagem inicial
 			display_mensagem(0,0) <= '1'; --A
 			display_mensagem(1,0) <= '1';
 			display_mensagem(2,0) <= '1';
@@ -1286,13 +1194,13 @@ begin  -- comportamento
 	end process;
 	
 	 -----------------------------------------------------------------------------
-  -- Brilho do pixel
+  -- Brilho do pixel_aux
   -----------------------------------------------------------------------------
-  -- O brilho do pixel é branco quando os contadores de linha e coluna, que
-  -- indicam o endereço do pixel sendo escrito para o quadro atual, casam com a
+  -- O brilho do pixel_aux é branco quando os contadores de linha e coluna, que
+  -- indicam o endereço do pixel_aux sendo escrito para o quadro atual, casam com a
   -- posição da bola (sinais pos_bola_x e pos_bola_y), com a posição dos PADs, 
   -- com o placar ou com a mensagem.
-  -- Caso contrário, o pixel é preto.
+  -- Caso contrário, o pixel_aux é preto.
 
 	process(CLOCK_50)
 	begin
@@ -1302,28 +1210,28 @@ begin  -- comportamento
 				if ((col = pos_bola_x) and (line = pos_bola_y)) 
 											  or ((abs(line-pos_PAD1) < 4) and col = 10)
 											  or ((abs(line-pos_PAD2) < 4) and col = 117) then
-					pixel_bit <= '1';
+					pixel_aux_bit <= '1';
 				-- Placar do jogador 1
 				elsif ((abs(line-5) < 3) and ((abs(col-55) < 3))) then
-					pixel_bit <= display_placar1(line-3, col-53);
+					pixel_aux_bit <= display_placar1(line-3, col-53);
 				-- Placar do jogador 2
 				elsif ((abs(line-5) < 3) and ((abs(col-71) < 3))) then
-					pixel_bit <= display_placar2(line-3, col-69);
+					pixel_aux_bit <= display_placar2(line-3, col-69);
 				-- Mensagem do começo e fim do jogo
-				elsif ((abs(line-25) < 3) and ((abs(col-63) < 24)) and ((flag_inicio = '0') or (flag_fim = '1')))then
-					pixel_bit <= display_mensagem(line-23, col-40);
+				elsif ((abs(line-25) < 3) and ((abs(col-63) < 24)) and ((flag_inicio_aux = '0') or (flag_fim = '1')))then
+					pixel_aux_bit <= display_mensagem(line-23, col-40);
 				else
-					pixel_bit <= '0';	
+					pixel_aux_bit <= '0';	
 				end if;
 			end if;
 		end if;
 	end process;
 	  
-  pixel <= (others => pixel_bit);
+  pixel_aux <= (others => pixel_aux_bit);
   
   -- O endereço de memória pode ser construído com essa fórmula simples,
   -- a partir da linha e coluna atual
-  addr  <= col + (128 * line);
+  addr_aux  <= col + (128 * line);
   
   -----------------------------------------------------------------------------
   -- Processos que definem a FSM (finite state machine), nossa máquina
@@ -1333,28 +1241,28 @@ begin  -- comportamento
   -- purpose: Esta é a lógica combinacional que calcula sinais de saída a partir
   --          do estado atual e alguns sinais de entrada (Máquina de Mealy).
   -- type   : combinational
-  -- inputs : estado, fim_escrita, timer, flag_inicio
-  -- outputs: proximo_estado, atualiza_pos_bola_x, atualiza_pos_bola_y, atualiza_pos_PADs, 
-  --          line_rstn, line_enable, col_rstn, col_enable, we, timer_enable, timer_rstn
-  logica_mealy: process (estado, fim_escrita, timer, flag_inicio)
+  -- inputs : estado, fim_escrita, timer, flag_inicio_aux
+  -- outputs: proximo_estado, atualiza_pos_bola_x_aux, atualiza_pos_bola_y_aux, atualiza_pos_PADs_aux, 
+  --          line_rstn, line_enable, col_rstn, col_enable, we_aux, timer_enable, timer_rstn
+  logica_mealy: process (estado, fim_escrita, timer, flag_inicio_aux)
   begin  -- process logica_mealy
     case estado is
-    when inicio_jogo      => if flag_inicio = '1' then
+    when inicio_jogo      => if flag_inicio_aux = '1' then
 										 proximo_estado <= inicio_partida;
 									  elsif timer = '1' then
 										 proximo_estado <= constroi_quadro;
                              else
 										 proximo_estado <= inicio_jogo;
                              end if;
-                             atualiza_pos_bola_x <= '0';
-                             atualiza_pos_bola_y <= '0';
-									  atualiza_pos_PADs   <= '0';
-									  flag_inicio_rstn <= '1';
+                             atualiza_pos_bola_x_aux <= '0';
+                             atualiza_pos_bola_y_aux <= '0';
+									  atualiza_pos_PADs_aux   <= '0';
+									  flag_inicio_aux_rstn <= '1';
                              line_rstn      <= '0';  -- reset é active low!
                              line_enable    <= '0';
                              col_rstn       <= '0';  -- reset é active low!
                              col_enable     <= '0';
-                             we             <= '0';
+                             we_aux             <= '0';
                              timer_rstn     <= '1';  -- reset é active low!
                              timer_enable   <= '1';
 									  
@@ -1363,89 +1271,89 @@ begin  -- comportamento
                              else
                                proximo_estado <= inicio_partida;
                              end if;
-                             atualiza_pos_bola_x <= '0';
-                             atualiza_pos_bola_y <= '0';
-									  atualiza_pos_PADs   <= '0';
-									  flag_inicio_rstn <= '1';
+                             atualiza_pos_bola_x_aux <= '0';
+                             atualiza_pos_bola_y_aux <= '0';
+									  atualiza_pos_PADs_aux   <= '0';
+									  flag_inicio_aux_rstn <= '1';
                              line_rstn      <= '0';  -- reset é active low!
                              line_enable    <= '0';
                              col_rstn       <= '0';  -- reset é active low!
                              col_enable     <= '0';
-                             we             <= '0';
+                             we_aux             <= '0';
                              timer_rstn     <= '1';  -- reset é active low!
                              timer_enable   <= '1';
 
     when constroi_quadro  => if fim_escrita = '1' then
 										if flag_fim = '1' then
 											proximo_estado <= game_over;
-											flag_inicio_rstn <= '0';
-										elsif flag_inicio = '1' then
+											flag_inicio_aux_rstn <= '0';
+										elsif flag_inicio_aux = '1' then
 											proximo_estado <= move_bola_e_PADs;
-											flag_inicio_rstn <= '1';
+											flag_inicio_aux_rstn <= '1';
 										else
 											proximo_estado <= inicio_jogo;
-											flag_inicio_rstn <= '1';
+											flag_inicio_aux_rstn <= '1';
 										end if;
                              else
                                proximo_estado <= constroi_quadro;
-										 flag_inicio_rstn <= '1';
+										 flag_inicio_aux_rstn <= '1';
                              end if;
-                             atualiza_pos_bola_x <= '0';
-                             atualiza_pos_bola_y <= '0';
-									  atualiza_pos_PADs   <= '0';		 
+                             atualiza_pos_bola_x_aux <= '0';
+                             atualiza_pos_bola_y_aux <= '0';
+									  atualiza_pos_PADs_aux   <= '0';		 
                              line_rstn      <= '1';
                              line_enable    <= '1';
                              col_rstn       <= '1';
                              col_enable     <= '1';
-                             we             <= '1';
+                             we_aux             <= '1';
                              timer_rstn     <= '0'; 
                              timer_enable   <= '0';
 
     when move_bola_e_PADs => if flag_fim = '1' then
 										proximo_estado <= game_over;
-										flag_inicio_rstn <= '0';
+										flag_inicio_aux_rstn <= '0';
 									  else
 										proximo_estado <= inicio_partida;
-										flag_inicio_rstn <= '1';
+										flag_inicio_aux_rstn <= '1';
 									  end if;
-                             atualiza_pos_bola_x <= '1';
-                             atualiza_pos_bola_y <= '1';
-									  atualiza_pos_PADs   <= '1';
+                             atualiza_pos_bola_x_aux <= '1';
+                             atualiza_pos_bola_y_aux <= '1';
+									  atualiza_pos_PADs_aux   <= '1';
                              line_rstn      <= '1';
                              line_enable    <= '0';
                              col_rstn       <= '1';
                              col_enable     <= '0';
-                             we             <= '0';
+                             we_aux             <= '0';
                              timer_rstn     <= '0'; 
                              timer_enable   <= '0';
 		
-     when game_over       => if flag_inicio = '1' then
+     when game_over       => if flag_inicio_aux = '1' then
 										proximo_estado <= inicio_jogo;
 									  else
 										proximo_estado <= constroi_quadro;
 									  end if;
-                             atualiza_pos_bola_x <= '0';
-                             atualiza_pos_bola_y <= '0';
-									  atualiza_pos_PADs   <= '0';
-									  flag_inicio_rstn <= '1';
+                             atualiza_pos_bola_x_aux <= '0';
+                             atualiza_pos_bola_y_aux <= '0';
+									  atualiza_pos_PADs_aux   <= '0';
+									  flag_inicio_aux_rstn <= '1';
                              line_rstn      <= '0';
                              line_enable    <= '0';
                              col_rstn       <= '0';
                              col_enable     <= '0';
-                             we             <= '0';
+                             we_aux             <= '0';
                              timer_rstn     <= '0';
                              timer_enable   <= '0';
 									  
      when others          => proximo_estado <= inicio_partida;
-                             atualiza_pos_bola_x <= '0';
-                             atualiza_pos_bola_y <= '0';
-									  atualiza_pos_PADs   <= '0';
-									  flag_inicio_rstn <= '1';
+                             atualiza_pos_bola_x_aux <= '0';
+                             atualiza_pos_bola_y_aux <= '0';
+									  atualiza_pos_PADs_aux   <= '0';
+									  flag_inicio_aux_rstn <= '1';
                              line_rstn      <= '1';
                              line_enable    <= '0';
                              col_rstn       <= '1';
                              col_enable     <= '0';
-                             we             <= '0';
+                             we_aux             <= '0';
                              timer_rstn     <= '1'; 
                              timer_enable   <= '0';
       
@@ -1500,4 +1408,13 @@ begin  -- comportamento
     end if;
   end process p_timer;
 
+  -- Conexao dos sinais com a saida
+  	atualiza_pos_bola_x <= atualiza_pos_bola_x_aux;
+	atualiza_pos_bola_y <= atualiza_pos_bola_y_aux;
+	atualiza_pos_PADs <= atualiza_pos_PADs_aux;
+	flag_inicio <= flag_inicio_aux;
+	we <= we_aux;
+	addr <= addr_aux;
+	pixel <= pixel_aux;
+	
 end comportamento;
