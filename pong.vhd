@@ -105,7 +105,7 @@ begin
 		vga_clk      => VGA_CLK,
 		sync         => sync,
 		blank        => blank);
-	VGA_SYNC_N <= NOT sync;
+	VGA_SYNC_N  <= NOT sync;
 	VGA_BLANK_N <= NOT blank;
 	
 	kbdex_ctrl_inst : kbdex_ctrl
@@ -114,12 +114,12 @@ begin
 		)
 		port map (
 			ps2_data => PS2_DAT,
-			ps2_clk => PS2_CLK,
+			ps2_clk  => PS2_CLK,
 			clk => CLOCK_50,
-			en => '1',
-			resetn => '1',
-			lights => "000",
-			key_on => key_on,
+			en  => '1',
+			resetn   => '1',
+			lights   => "000",
+			key_on   => key_on,
 			key_code => key_code
 		);
 
@@ -128,17 +128,17 @@ begin
 			CLOCK_50 => CLOCK_50,
 			pontos_PAD1 => pontos_PAD1,
 			pontos_PAD2 => pontos_PAD2,
-			pos_bola_x => pos_bola_x,
-			pos_bola_y => pos_bola_y,
+			pos_bola_x  => pos_bola_x,
+			pos_bola_y  => pos_bola_y,
 			pos_PAD1 => pos_PAD1,
 			pos_PAD2 => pos_PAD2,
-			key_on => key_on,
+			key_on   => key_on,
 			key_code => key_code,
 			atualiza_pos_bola_x => atualiza_pos_bola_x,
 			atualiza_pos_bola_y => atualiza_pos_bola_y,
 			flag_inicio => flag_inicio,
-			we => we,
-			addr => addr,
+			we    => we,
+			addr  => addr,
 			pixel => pixel
 		);
 
@@ -147,21 +147,21 @@ begin
 			atualiza_pos_bola_x => atualiza_pos_bola_x,
 			atualiza_pos_bola_y => atualiza_pos_bola_y,
 			flag_inicio => flag_inicio,
-			pos_PAD1 => pos_PAD1,
-			pos_PAD2 => pos_PAD2,
+			pos_PAD1    => pos_PAD1,
+			pos_PAD2    => pos_PAD2,
 			pontos_PAD1 => pontos_PAD1,
 			pontos_PAD2 => pontos_PAD2, 
-			pos_bola_x => pos_bola_x,
-			pos_bola_y => pos_bola_y
+			pos_bola_x  => pos_bola_x,
+			pos_bola_y  => pos_bola_y
 		);
 
 	padcon_inst: padcon
 		port map (
 			atualiza_pos_PADs => atualiza_pos_PADs,
-			key_on => key_on,
+			key_on   => key_on,
 			key_code => key_code,
-			pos_PAD1=> pos_PAD1,
-			pos_PAD2=> pos_PAD2
+			pos_PAD1 => pos_PAD1,
+			pos_PAD2 => pos_PAD2
 		);
 		
 end rtl;
