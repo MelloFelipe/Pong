@@ -3,16 +3,16 @@ use ieee.std_logic_1164.all;
 
 entity UC is
   port (    
-    CLOCK_50                  : in  std_logic;
-	 pontos_PAD1, pontos_PAD2: in integer range 0 to 7;
-	 pos_bola_x: in integer range 0 to 127;
-	 pos_bola_y: in integer range 0 to 95;
-	 pos_PAD1, pos_PAD2: in integer range 3 to 92;
-	 key_on  : in std_logic_vector(2 downto 0);
-    key_code: in std_logic_vector(47 downto 0);
-	 atualiza_pos_bola_x, atualiza_pos_bola_y, atualiza_pos_PADs: out std_logic;
-	 flag_inicio, we: out std_logic;
-	 addr : out integer range 0 to 12287;
+    CLOCK_50 : in  std_logic;
+	 pontos_PAD1, pontos_PAD2 : in integer range 0 to 7;
+	 pos_bola_x : in integer range 0 to 127;
+	 pos_bola_y : in integer range 0 to 95;
+	 pos_PAD1, pos_PAD2 : in integer range 3 to 92;
+	 key_on   : in std_logic_vector(2 downto 0);
+    key_code : in std_logic_vector(47 downto 0);
+	 atualiza_pos_bola_x, atualiza_pos_bola_y, atualiza_pos_PADs : out std_logic;
+	 flag_inicio, we : out std_logic;
+	 addr  : out integer range 0 to 12287;
 	 pixel : out std_logic_vector(2 downto 0)  -- valor de cor do pixel_aux
     );
 end UC;
@@ -21,8 +21,8 @@ architecture comportamento of UC is
 	
   -- Interface com a memória de vídeo do controlador
 
-  signal we_aux : std_logic;                        -- write enable ('1' p/ escrita)
-  signal addr_aux : integer range 0 to 12287;       -- endereco mem. vga
+  signal we_aux    : std_logic;                        -- write enable ('1' p/ escrita)
+  signal addr_aux  : integer range 0 to 12287;       -- endereco mem. vga
   signal pixel_aux : std_logic_vector(2 downto 0);  -- valor de cor do pixel_aux
   signal pixel_aux_bit : std_logic;                 -- um bit do vetor acima
 
@@ -30,12 +30,12 @@ architecture comportamento of UC is
   -- as posições da memória de vídeo (pixel_auxs) no momento de construir um quadro.
   
   signal line : integer range 0 to 95;  -- linha atual
-  signal col : integer range 0 to 127;  -- coluna atual
+  signal col  : integer range 0 to 127;  -- coluna atual
 
-  signal col_rstn : std_logic;          -- reset do contador de colunas
+  signal col_rstn   : std_logic;          -- reset do contador de colunas
   signal col_enable : std_logic;        -- enable do contador de colunas
 
-  signal line_rstn : std_logic;          -- reset do contador de linhas
+  signal line_rstn   : std_logic;          -- reset do contador de linhas
   signal line_enable : std_logic;        -- enable do contador de linhas
 
   signal fim_escrita : std_logic;       -- '1' quando um quadro terminou de ser
@@ -58,13 +58,13 @@ architecture comportamento of UC is
   -- alimentado com um clock de 50MHz, ele demore 25ms (40fps) para contar até o final.
   
   signal contador : integer range 0 to 1250000 - 1 := 0;  -- contador
-  signal timer : std_logic;        -- vale '1' quando o contador chegar ao fim
+  signal timer    : std_logic;        -- vale '1' quando o contador chegar ao fim
   signal timer_rstn, timer_enable : std_logic;
 
   signal atualiza_pos_PADs_aux : std_logic;    -- se '1' = PAD1 e PAD2 muda sua pos. no eixo y
   
   signal flag_inicio_aux, flag_fim : std_logic := '0'; -- verifica se o jogo foi iniciado
-  signal flag_inicio_aux_rstn: std_logic := '1'; -- reseta valor da flag, ativo em baixo
+  signal flag_inicio_aux_rstn : std_logic := '1'; -- reseta valor da flag, ativo em baixo
   
   type matrix_pequena is array(4 downto 0, 4 downto 0) of std_logic;
   signal display_placar1, display_placar2 : matrix_pequena;
@@ -1262,7 +1262,7 @@ begin  -- comportamento
                              line_enable    <= '0';
                              col_rstn       <= '0';  -- reset é active low!
                              col_enable     <= '0';
-                             we_aux             <= '0';
+                             we_aux         <= '0';
                              timer_rstn     <= '1';  -- reset é active low!
                              timer_enable   <= '1';
 									  
@@ -1279,7 +1279,7 @@ begin  -- comportamento
                              line_enable    <= '0';
                              col_rstn       <= '0';  -- reset é active low!
                              col_enable     <= '0';
-                             we_aux             <= '0';
+                             we_aux         <= '0';
                              timer_rstn     <= '1';  -- reset é active low!
                              timer_enable   <= '1';
 
@@ -1305,7 +1305,7 @@ begin  -- comportamento
                              line_enable    <= '1';
                              col_rstn       <= '1';
                              col_enable     <= '1';
-                             we_aux             <= '1';
+                             we_aux         <= '1';
                              timer_rstn     <= '0'; 
                              timer_enable   <= '0';
 
@@ -1323,7 +1323,7 @@ begin  -- comportamento
                              line_enable    <= '0';
                              col_rstn       <= '1';
                              col_enable     <= '0';
-                             we_aux             <= '0';
+                             we_aux         <= '0';
                              timer_rstn     <= '0'; 
                              timer_enable   <= '0';
 		
@@ -1340,7 +1340,7 @@ begin  -- comportamento
                              line_enable    <= '0';
                              col_rstn       <= '0';
                              col_enable     <= '0';
-                             we_aux             <= '0';
+                             we_aux         <= '0';
                              timer_rstn     <= '0';
                              timer_enable   <= '0';
 									  
@@ -1353,7 +1353,7 @@ begin  -- comportamento
                              line_enable    <= '0';
                              col_rstn       <= '1';
                              col_enable     <= '0';
-                             we_aux             <= '0';
+                             we_aux         <= '0';
                              timer_rstn     <= '1'; 
                              timer_enable   <= '0';
       
@@ -1411,10 +1411,10 @@ begin  -- comportamento
   -- Conexao dos sinais com a saida
   	atualiza_pos_bola_x <= atualiza_pos_bola_x_aux;
 	atualiza_pos_bola_y <= atualiza_pos_bola_y_aux;
-	atualiza_pos_PADs <= atualiza_pos_PADs_aux;
+	atualiza_pos_PADs   <= atualiza_pos_PADs_aux;
 	flag_inicio <= flag_inicio_aux;
-	we <= we_aux;
-	addr <= addr_aux;
+	we    <= we_aux;
+	addr  <= addr_aux;
 	pixel <= pixel_aux;
 	
 end comportamento;
