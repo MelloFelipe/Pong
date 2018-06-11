@@ -129,5 +129,5 @@ begin  -- structure
   pos_bola_y <= pos_bola_y_local;
   pontos_PAD1 <= pontos_PAD1_local;
   pontos_PAD2 <= pontos_PAD2_local;
-  
+ 
 end structure;
