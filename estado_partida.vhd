@@ -3,13 +3,13 @@ use ieee.std_logic_1164.all;
 
 entity estado_partida is
   port (
-	atualiza_pos_bola_x, atualiza_pos_bola_y: in std_logic;
-	flag_inicio: in std_logic;
-	pos_PAD1 :   in integer range 3 to 92;   
-   pos_PAD2 :   in integer range 3 to 92;   
-	pontos_PAD1, pontos_PAD2: out integer range 0 to 7;
-	pos_bola_x: out integer range 0 to 127;
-	pos_bola_y: out integer range 0 to 95
+	atualiza_pos_bola_x, atualiza_pos_bola_y : in std_logic;
+	flag_inicio : in std_logic;
+	pos_PAD1    :   in integer range 3 to 92;   
+   pos_PAD2    :   in integer range 3 to 92;   
+	pontos_PAD1, pontos_PAD2 : out integer range 0 to 7;
+	pos_bola_x : out integer range 0 to 127;
+	pos_bola_y : out integer range 0 to 95
     );
 end estado_partida;
 
@@ -47,7 +47,7 @@ begin  -- structure
   begin  -- process p_atualiza_pos_bola_x
     if atualiza_pos_bola_x'event and atualiza_pos_bola_x = '1' then  -- rising clock edge
      -- if atualiza_pos_bola_x = '1' then
-			if flag_inicio = '1' and (pontos_PAD1_local >=7 or pontos_PAD2_local >= 7) then
+		  if flag_inicio = '1' and (pontos_PAD1_local >=7 or pontos_PAD2_local >= 7) then
 				pontos_PAD1_local <= 0;
 				pontos_PAD2_local <= 0;
         elsif direcao = direita then         
@@ -88,7 +88,7 @@ begin  -- structure
   -- outputs: pos_bola_y_local
   p_atualiza_pos_bola_y: process (atualiza_pos_bola_y)
     type direcao_t is (desce, sobe);
-    variable direcao : direcao_t := desce;
+    variable direcao : direcao_t := sobe; -- mudado de desce para sobe
   begin  -- process p_atualiza_pos_bola_x
     if atualiza_pos_bola_y'event and atualiza_pos_bola_y = '1' then  -- rising clock edge
      -- if atualiza_pos_bola_y = '1' then
@@ -129,5 +129,5 @@ begin  -- structure
   pos_bola_y <= pos_bola_y_local;
   pontos_PAD1 <= pontos_PAD1_local;
   pontos_PAD2 <= pontos_PAD2_local;
- 
+  
 end structure;
