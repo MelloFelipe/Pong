@@ -3,17 +3,17 @@ use ieee.std_logic_1164.all;
 
 entity padcon is
   port (
-	atualiza_pos_PADs: in std_logic;
-	key_on  : in std_logic_vector(2 downto 0);
-	key_code: in std_logic_vector(47 downto 0);
-	pos_PAD1, pos_PAD2: out integer range 3 to 92
+	atualiza_pos_PADs : in std_logic;
+	key_on   : in std_logic_vector(2 downto 0);
+	key_code : in std_logic_vector(47 downto 0);
+	pos_PAD1, pos_PAD2 : out integer range 3 to 92
     );
 end padcon;
 
 architecture structure of padcon is
   
-  signal pos_PAD1_local: integer range 3 to 92 := 47;
-  signal pos_PAD2_local: integer range 3 to 92 := 47;
+  signal pos_PAD1_local : integer range 3 to 92 := 47;
+  signal pos_PAD2_local : integer range 3 to 92 := 47;
   
 begin  -- structure
 
